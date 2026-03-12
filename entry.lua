@@ -3,6 +3,7 @@
 local config = require("config")
 local uuid   = require("uuid")
 local db     = require("db")
+local wl     = require("whitelist")
 
 local pedestal = peripheral.wrap(config.PEDESTAL_NAME)
     or error("Item Pedestal not found: " .. config.PEDESTAL_NAME, 0)
@@ -38,6 +39,7 @@ do
     end
 end
 db.load()
+wl.load()
 
 local function monDraw(state)
     if not monitor then return end
@@ -122,15 +124,15 @@ local function verifyAndProcess()
 
     local entry = db.getTicket(key)
 
-    if not entry then
+    if not entry or entry.used then
         monDraw("reject")
         sleep(3)
         monDraw("idle")
         return
     end
 
-    -- Single-use: remove from DB before opening door
-    db.removeTicket(key)
+    -- Single-use: mark as used before opening door
+    db.markUsed(key)
     db.save()
     destroyTicket()
 
@@ -172,6 +174,17 @@ local function listenForPings()
     end
 end
 
+local function listenForWhitelistChecks()
+    while true do
+        local senderId, msg = rednet.receive(config.PROTOCOL_WHITELIST_CHECK)
+        if senderId == config.KASA_COMPUTER_ID and type(msg) == "string" then
+            local trusted = wl.isWhitelisted(msg)
+            print(string.format("[ENTRY] Whitelist check: nick=%s result=%s", msg, tostring(trusted)))
+            rednet.send(senderId, trusted, config.PROTOCOL_WHITELIST_RESPONSE)
+        end
+    end
+end
+
 local function listenForCountRequests()
     while true do
         local senderId, msg = rednet.receive(config.PROTOCOL_COUNT_REQUEST)
@@ -208,5 +221,6 @@ parallel.waitForAll(
     scanPedestal,
     listenForRegistrations,
     listenForPings,
-    listenForCountRequests
+    listenForCountRequests,
+    listenForWhitelistChecks
 )

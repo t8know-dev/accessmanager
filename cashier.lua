@@ -80,52 +80,52 @@ local function padCenter(text, w)
     return string.rep(" ", pad) .. text .. string.rep(" ", w - pad - #text)
 end
 
--- Animated header (row 1)
+-- Animated header (rows 1–3)
 local headerLabel = main:addLabel()
-    :setText(padCenter("*** TICKETS ***", W))
+    :setText("\n" .. padCenter("*** TICKETS ***", W))
     :setPosition(1, 1)
-    :setSize(W, 1)
+    :setSize(W, 3)
     :setBackground(colors.blue)
     :setForeground(colors.white)
 
--- Base name (row 2)
+-- Base name (row 4)
 main:addLabel()
     :setText(padCenter(config.BASE_NAME, W))
-    :setPosition(1, 2)
+    :setPosition(1, 4)
     :setSize(W, 1)
     :setBackground(colors.blue)
     :setForeground(colors.yellow)
 
--- Price (row 4)
+-- Price (row 6)
 main:addLabel()
     :setText("Single-use ticket: " .. config.TICKET_PRICE_SPURS .. " spur")
-    :setPosition(2, 4)
+    :setPosition(2, 6)
     :setForeground(colors.yellow)
 
--- Status box with background highlight (row 6)
+-- Status box with background highlight (row 8)
 local statusBox = main:addLabel()
     :setText(padCenter("Waiting...", W))
-    :setPosition(1, 6)
+    :setPosition(1, 8)
     :setSize(W, 1)
     :setBackground(colors.gray)
     :setForeground(colors.lime)
 
--- Player section (rows 8–9)
+-- Player section (rows 10–11)
 main:addLabel()
     :setText("Detected player:")
-    :setPosition(2, 8)
+    :setPosition(2, 10)
     :setForeground(colors.gray)
 
 local detectedLabel = main:addLabel()
     :setText("(no player nearby)")
-    :setPosition(2, 9)
+    :setPosition(2, 11)
     :setSize(W - 2, 1)
     :setForeground(colors.orange)
 
--- Active ticket count from entry (row 11)
+-- Active ticket count from entry (row 13)
 local activeLabel = main:addLabel()
-    :setText("Tickets in queue: ?")
-    :setPosition(2, 11)
+    :setText("Tickets sold: ?")
+    :setPosition(2, 13)
     :setForeground(colors.gray)
 
 -- Buttons
@@ -227,6 +227,15 @@ local function registerTicketAtEntry(key, nick)
     return senderId == config.ENTRY_COMPUTER_ID and msg == "ok"
 end
 
+local function checkWhitelist(nick)
+    rednet.send(config.ENTRY_COMPUTER_ID, nick, config.PROTOCOL_WHITELIST_CHECK)
+    local senderId, result = rednet.receive(config.PROTOCOL_WHITELIST_RESPONSE, config.REDNET_TIMEOUT)
+    if senderId == config.ENTRY_COMPUTER_ID then
+        return result == true
+    end
+    return false
+end
+
 local function fetchActiveCount()
     rednet.send(config.ENTRY_COMPUTER_ID, "count", config.PROTOCOL_COUNT_REQUEST)
     local senderId, count = rednet.receive(config.PROTOCOL_COUNT_RESPONSE, config.REDNET_TIMEOUT)
@@ -238,7 +247,7 @@ end
 
 local function refreshActiveLabel()
     local cnt = fetchActiveCount()
-    activeLabel:setText("Tickets in queue: " .. (cnt ~= nil and tostring(cnt) or "?"))
+    activeLabel:setText("Tickets sold: " .. (cnt ~= nil and tostring(cnt) or "?"))
 end
 
 -- ─── Purchase flow ───────────────────────────────────────────
@@ -261,42 +270,52 @@ local function handlePurchase(nick)
         return finishPurchase("ERROR: " .. checksErr, colors.white, colors.red)
     end
 
-    state.status = "waiting_payment"
-    cancelRequested = false
-    cancelBtn:setVisible(true)
-    unlockDepositor()
-    setStatus("Insert " .. config.TICKET_PRICE_SPURS .. " spur into Depositor...", colors.yellow, colors.gray)
-    writeLog("Waiting for payment: " .. nick)
+    setStatus("Checking whitelist...", colors.yellow, colors.gray)
+    local trusted = checkWhitelist(nick)
 
-    -- Let signal stabilize after unlock, then snapshot baseline state
-    os.sleep(0.3)
-    local baseline = relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE)
-    writeLog("Relay baseline: " .. tostring(baseline))
+    if trusted then
+        writeLog("Whitelist match for: " .. nick .. " - skipping payment")
+        setStatus("Trusted player - no payment required", colors.lime, colors.gray)
+        os.sleep(1.5)
+    else
+        state.status = "waiting_payment"
+        cancelRequested = false
+        cancelBtn:setVisible(true)
+        unlockDepositor()
+        setStatus("Insert " .. config.TICKET_PRICE_SPURS .. " spur into Depositor...", colors.yellow, colors.gray)
+        writeLog("Waiting for payment: " .. nick)
 
-    -- Payment detected as ANY transition away from baseline (inverted LOW pulse on payment)
-    local paid = false
-    local deadline = os.clock() + config.PAYMENT_TIMEOUT
-    while os.clock() < deadline and not cancelRequested do
-        if relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) ~= baseline then
-            paid = true; break
+        -- Let signal stabilize after unlock, then snapshot baseline state
+        os.sleep(0.3)
+        local baseline = relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE)
+        writeLog("Relay baseline: " .. tostring(baseline))
+
+        -- Payment detected as ANY transition away from baseline (inverted LOW pulse on payment)
+        local paid = false
+        local deadline = os.clock() + config.PAYMENT_TIMEOUT
+        while os.clock() < deadline and not cancelRequested do
+            if relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) ~= baseline then
+                paid = true; break
+            end
+            os.sleep(0.05)
         end
-        os.sleep(0.05)
+
+        lockDepositor()
+        cancelBtn:setVisible(false)
+
+        if cancelRequested then
+            writeLog("Order cancelled for: " .. nick)
+            return finishPurchase("Order cancelled", colors.orange, colors.gray)
+        end
+
+        if not paid then
+            writeLog("ERROR: payment timeout for: " .. nick)
+            return finishPurchase("Payment timeout - try again", colors.white, colors.red)
+        end
+
+        writeLog("Payment confirmed for: " .. nick)
     end
 
-    lockDepositor()
-    cancelBtn:setVisible(false)
-
-    if cancelRequested then
-        writeLog("Order cancelled for: " .. nick)
-        return finishPurchase("Order cancelled", colors.orange, colors.gray)
-    end
-
-    if not paid then
-        writeLog("ERROR: payment timeout for: " .. nick)
-        return finishPurchase("Payment timeout - try again", colors.white, colors.red)
-    end
-
-    writeLog("Payment confirmed for: " .. nick)
     state.status = "printing"
     setStatus("Printing ticket...", colors.yellow, colors.gray)
 
@@ -318,7 +337,8 @@ local function handlePurchase(nick)
 
     state.soldCount = state.soldCount + 1
     refreshActiveLabel()
-    writeLog("SOLD: ticket for " .. nick .. " (session total: " .. state.soldCount .. ")")
+    local logSuffix = trusted and " [TRUSTED/FREE]" or ""
+    writeLog("SOLD: ticket for " .. nick .. logSuffix .. " (session total: " .. state.soldCount .. ")")
     finishPurchase("Ticket sold! Collect from pedestal.", colors.white, colors.lime)
 end
 
@@ -370,7 +390,7 @@ basalt.schedule(function()
         local f = frames[i]
         headerLabel:setBackground(f.bg)
         headerLabel:setForeground(f.fg)
-        headerLabel:setText(padCenter(f.tx, W))
+        headerLabel:setText("\n" .. padCenter(f.tx, W))
         i = (i % #frames) + 1
         os.sleep(0.5)
     end
