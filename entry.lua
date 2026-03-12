@@ -67,20 +67,8 @@ local function monDraw(state)
         local cx = math.floor(w / 2)
         local cy = math.floor(h / 2)
 
-        -- monitor.setCursorPos(cx, cy)
-        -- monitor.write("\4")
-
-        for i = 0, math.min(w, h) - 2 do
-            local lx = math.max(1, cx - 2) + i
-            local ly = cy + i - 1
-            if lx >= 1 and lx <= w and ly >= 1 and ly <= h then
-                monitor.setBackgroundColor(fg)
-                monitor.setTextColor(bg)
-                monitor.setCursorPos(lx, ly)
-                monitor.write(" ")
-                monitor.setBackgroundColor(bg)
-            end
-        end
+        monitor.setCursorPos(cx, cy)
+        monitor.write("\4")
 
     elseif state == "reject" then
         local steps = math.min(w, h) - 2
