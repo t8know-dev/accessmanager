@@ -29,14 +29,14 @@ config.RELAY_DOOR_SIDE1 = "top"
 config.RELAY_DOOR_SIDE2 = "bottom"
 
 -- Dump chest: set DUMP_CHEST_NAME for network, or DUMP_CHEST_SIDE for direct connection
-config.DUMP_CHEST_NAME = "minecraft:chest_38"
+config.DUMP_CHEST_NAME = 'minecraft:chest_38'
 config.DUMP_CHEST_SIDE = nil
 
 config.TICKET_PRICE_SPURS = 2
 config.PAYMENT_TIMEOUT    = 60   -- seconds
 
 config.TICKET_TITLE = "Entry Ticket"
-config.BASE_NAME    = "My Base"
+config.BASE_NAME    = "Thajiggman's base"
 
 config.DOOR_OPEN_SECONDS = 5
 config.REDNET_TIMEOUT    = 10
