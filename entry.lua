@@ -44,23 +44,64 @@ local function monDraw(state)
     if not monitor then return end
     local w, h = monitor.getSize()
 
-    local bg, symbol
+    local bg, fg
     if state == "ok" then
-        bg, symbol = colors.green, "\xfb"  -- znak √
+        bg, fg = colors.green, colors.black
     elseif state == "reject" then
-        bg, symbol = colors.red, "x"
+        bg, fg = colors.red, colors.black
     else
-        bg, symbol = colors.black, "-"
+        bg, fg = colors.black, colors.gray
     end
 
     local old = term.redirect(monitor)
     paintutils.drawFilledBox(1, 1, w, h, bg)
     term.redirect(old)
 
-    monitor.setBackgroundColor(bg)
-    monitor.setTextColor(colors.black)
-    monitor.setCursorPos(math.floor(w / 2) + 1, math.floor(h / 2) + 1)
-    monitor.write(symbol)
+    if state == "ok" then
+        local steps = math.min(w, h) - 2
+        local mid_x = 2 + math.floor(steps * 0.3)
+        local mid_y = h - 1
+
+        for i = 0, math.floor(steps * 0.3) do
+            local x = 2 + i
+            local y = (h - 2) + math.floor(i * 1 / math.max(1, math.floor(steps * 0.3)))
+            monitor.setBackgroundColor(fg)
+            monitor.setCursorPos(x, y)
+            monitor.write(" ")
+            monitor.setBackgroundColor(bg)
+        end
+
+        local right_steps = steps - math.floor(steps * 0.3)
+        for i = 0, right_steps do
+            local x = mid_x + math.floor(i * (w - 1 - mid_x) / math.max(1, right_steps))
+            local y = mid_y - math.floor(i * (mid_y - 2) / math.max(1, right_steps))
+            monitor.setBackgroundColor(fg)
+            monitor.setCursorPos(x, y)
+            monitor.write(" ")
+            monitor.setBackgroundColor(bg)
+        end
+
+    elseif state == "reject" then
+        local steps = math.min(w, h) - 2
+        for i = 0, steps do
+            local x1 = 2 + math.floor(i * (w - 3) / steps)
+            local y1 = 2 + math.floor(i * (h - 3) / steps)
+            local x2 = (w - 1) - math.floor(i * (w - 3) / steps)
+            local y2 = 2 + math.floor(i * (h - 3) / steps)
+            monitor.setBackgroundColor(fg)
+            monitor.setCursorPos(x1, y1)
+            monitor.write(" ")
+            monitor.setCursorPos(x2, y2)
+            monitor.write(" ")
+            monitor.setBackgroundColor(bg)
+        end
+
+    else
+        monitor.setBackgroundColor(bg)
+        monitor.setTextColor(fg)
+        monitor.setCursorPos(math.floor(w / 2) + 1, math.floor(h / 2) + 1)
+        monitor.write("-")
+    end
 end
 
 local function openDoor()
