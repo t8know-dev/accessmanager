@@ -42,7 +42,7 @@ end
 depositor.setTotalPrice(config.TICKET_PRICE_SPURS)
 relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)
 
--- ─── Logging ────────────────────────────────────────────────
+--  Logging 
 local LOG_FILE = "/cashier_log.txt"
 
 local function writeLog(msg)
@@ -60,7 +60,7 @@ local function writeLog(msg)
     end
 end
 
--- ─── State ──────────────────────────────────────────────────
+--  State 
 local state = {
     status       = "idle",
     soldCount    = 0,
@@ -69,7 +69,7 @@ local state = {
 
 local cancelRequested = false
 
--- ─── GUI setup ──────────────────────────────────────────────
+--  GUI setup 
 local main = basalt.getMainFrame()
 main:setBackground(colors.black)
 
@@ -153,7 +153,7 @@ local cancelBtn = main:addButton()
     :setForeground(colors.white)
 cancelBtn:setVisible(false)
 
--- ─── Helpers ─────────────────────────────────────────────────
+--  Helpers 
 local function setStatus(msg, col, bg)
     statusBox:setText(padCenter(msg, W))
     statusBox:setForeground(col or colors.lime)
@@ -259,7 +259,7 @@ local function refreshActiveLabel()
     activeLabel:setText("Tickets sold: " .. (cnt ~= nil and tostring(cnt) or "?"))
 end
 
--- ─── Purchase flow ───────────────────────────────────────────
+--  Purchase flow 
 local function finishPurchase(msg, fg, bg)
     setStatus(msg, fg, bg or colors.gray)
     os.sleep(config.POST_PURCHASE_DISPLAY_SECONDS)
@@ -351,7 +351,7 @@ local function handlePurchase(nick)
     finishPurchase("Ticket sold! Collect from pedestal.", colors.white, colors.lime)
 end
 
--- ─── Button handlers ─────────────────────────────────────────
+--  Button handlers 
 buyBtn:onClick(function()
     if state.status ~= "idle" then return end
     local nick = state.detectedNick
@@ -367,7 +367,7 @@ cancelBtn:onClick(function()
     cancelRequested = true
 end)
 
--- ─── Background tasks ────────────────────────────────────────
+--  Background tasks 
 -- Update detected player every second
 basalt.schedule(function()
     while true do
@@ -399,7 +399,7 @@ basalt.schedule(function()
     end
 end)
 
--- Animated header: cycle frames to force Basalt re-render (setText triggers render)
+-- Animated header: cycle frames to force Basalt re-render
 basalt.schedule(function()
     local frames = {
         { bg = colors.blue,      fg = colors.white,  tx = "  * TICKETS *  " },
