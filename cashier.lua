@@ -1,4 +1,4 @@
--- cashier.lua - Cashier Computer (computer_391)
+-- cashier.lua - Cashier Computer
 
 local config = require("config")
 local uuid   = require("uuid")
@@ -13,13 +13,10 @@ local basalt = require("basalt")
 
 local depositor = peripheral.wrap(config.DEPOSITOR_NAME)
     or error("Depositor not found: " .. config.DEPOSITOR_NAME, 0)
-
 local printer = peripheral.wrap(config.PRINTER_SIDE)
     or error("Printer not found on side: " .. config.PRINTER_SIDE, 0)
-
 local relayLock = peripheral.wrap(config.RELAY_DEPOSIT_LOCK_NAME)
     or error("Relay (lock) not found: " .. config.RELAY_DEPOSIT_LOCK_NAME, 0)
-
 local relayPulse = peripheral.wrap(config.RELAY_DEPOSIT_OUT_NAME)
     or error("Relay (pulse) not found: " .. config.RELAY_DEPOSIT_OUT_NAME, 0)
 
@@ -29,18 +26,11 @@ if not detector then
 end
 
 do
-    local native = term.native()
-    local function nprint(msg)
-        local prev = term.redirect(native)
-        print(msg)
-        term.redirect(prev)
-    end
     local opened = false
-    nprint("[CASHIER] Peripherals: " .. table.concat(peripheral.getNames(), ", "))
     for _, name in ipairs(peripheral.getNames()) do
         if peripheral.getType(name) == "modem" then
             rednet.open(name)
-            nprint("[CASHIER] Opened modem: " .. name .. " isOpen=" .. tostring(rednet.isOpen(name)))
+            print("[CASHIER] Opened modem: " .. name .. " isOpen=" .. tostring(rednet.isOpen(name)))
             opened = true
         end
     end
@@ -48,101 +38,97 @@ do
         error("[CASHIER] No modem found! Check connections.", 0)
     end
 end
+
 depositor.setTotalPrice(config.TICKET_PRICE_SPURS)
 relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)
 
--- Debug helper: always prints to the native computer terminal,
--- regardless of monitor redirect.
-local function dbg(msg)
+-- ─── Logging ────────────────────────────────────────────────
+local LOG_FILE = "/cashier_log.txt"
+
+local function writeLog(msg)
     local t = os.date("*t")
-    local line = string.format("[%02d:%02d:%02d] %s", t.hour, t.min, t.sec, msg)
+    local ts = string.format("[%04d-%02d-%02d %02d:%02d:%02d]",
+        t.year, t.month, t.day, t.hour, t.min, t.sec)
+    local line = ts .. " " .. msg
     local prev = term.redirect(term.native())
     print(line)
     term.redirect(prev)
+    local f = fs.open(LOG_FILE, "a")
+    if f then
+        f.writeLine(line)
+        f.close()
+    end
 end
 
+-- ─── State ──────────────────────────────────────────────────
 local state = {
-    status        = "idle",
-    lastTicketKey = nil,
-    lastNick      = nil,
-    soldCount     = 0,
-    logLines      = {},
-    detectedNick  = nil,
-    purchasing    = false,
+    status       = "idle",
+    soldCount    = 0,
+    detectedNick = nil,
 }
 
 local cancelRequested = false
 
+-- ─── GUI setup ──────────────────────────────────────────────
 local main = basalt.getMainFrame()
 main:setBackground(colors.black)
 
 local W, H = term.getSize()
 
-main:addLabel()
-    :setText(" " .. config.BASE_NAME .. " - TICKET BOOTH ")
+local function padCenter(text, w)
+    local pad = math.max(0, math.floor((w - #text) / 2))
+    return string.rep(" ", pad) .. text .. string.rep(" ", w - pad - #text)
+end
+
+-- Animated header (row 1)
+local headerLabel = main:addLabel()
+    :setText(padCenter("*** TICKETS ***", W))
     :setPosition(1, 1)
     :setSize(W, 1)
     :setBackground(colors.blue)
     :setForeground(colors.white)
 
+-- Base name (row 2)
 main:addLabel()
-    :setText("Single-use ticket: " .. config.TICKET_PRICE_SPURS .. " spur")
-    :setPosition(2, 3)
+    :setText(padCenter(config.BASE_NAME, W))
+    :setPosition(1, 2)
+    :setSize(W, 1)
+    :setBackground(colors.blue)
     :setForeground(colors.yellow)
 
+-- Price (row 4)
+main:addLabel()
+    :setText("Single-use ticket: " .. config.TICKET_PRICE_SPURS .. " spur")
+    :setPosition(2, 4)
+    :setForeground(colors.yellow)
+
+-- Status box with background highlight (row 6)
 local statusBox = main:addLabel()
-    :setText("[ Waiting ]")
-    :setPosition(2, 5)
-    :setSize(W - 2, 1)
+    :setText(padCenter("Waiting...", W))
+    :setPosition(1, 6)
+    :setSize(W, 1)
+    :setBackground(colors.gray)
     :setForeground(colors.lime)
 
+-- Player section (rows 8–9)
 main:addLabel()
     :setText("Detected player:")
-    :setPosition(2, 7)
+    :setPosition(2, 8)
     :setForeground(colors.gray)
 
 local detectedLabel = main:addLabel()
     :setText("(no player nearby)")
-    :setPosition(2, 8)
+    :setPosition(2, 9)
     :setSize(W - 2, 1)
     :setForeground(colors.orange)
 
-main:addLabel()
-    :setText("Last ticket:")
-    :setPosition(2, 10)
-    :setForeground(colors.gray)
-
-local lastKeyLabel = main:addLabel()
-    :setText("-")
+-- Active ticket count from entry (row 11)
+local activeLabel = main:addLabel()
+    :setText("Tickets in queue: ?")
     :setPosition(2, 11)
-    :setSize(W - 2, 1)
-    :setForeground(colors.cyan)
-
-local lastNickLabel = main:addLabel()
-    :setText("")
-    :setPosition(2, 12)
-    :setSize(W - 2, 1)
-    :setForeground(colors.lightGray)
-
-main:addLabel()
-    :setText("Log:")
-    :setPosition(2, 14)
     :setForeground(colors.gray)
 
-local logLabels = {}
-for i = 1, 3 do
-    logLabels[i] = main:addLabel()
-        :setText("")
-        :setPosition(2, 14 + i)
-        :setSize(W - 2, 1)
-        :setForeground(colors.lightGray)
-end
-
-local counterLabel = main:addLabel()
-    :setText("Sold: 0")
-    :setPosition(2, H)
-    :setForeground(colors.gray)
-
+-- Buttons
 local buyBtn = main:addButton()
     :setText(" BUY TICKET ")
     :setPosition(2, H - 3)
@@ -158,19 +144,11 @@ local cancelBtn = main:addButton()
     :setForeground(colors.white)
 cancelBtn:setVisible(false)
 
-local function addLog(msg)
-    local t = os.date("*t")
-    local entry = string.format("[%02d:%02d] %s", t.hour, t.min, msg)
-    table.insert(state.logLines, 1, entry)
-    if #state.logLines > 3 then table.remove(state.logLines) end
-    for i, lbl in ipairs(logLabels) do
-        lbl:setText(state.logLines[i] or "")
-    end
-end
-
-local function setStatus(msg, col)
-    statusBox:setText("[ " .. msg .. " ]")
+-- ─── Helpers ─────────────────────────────────────────────────
+local function setStatus(msg, col, bg)
+    statusBox:setText(padCenter(msg, W))
     statusBox:setForeground(col or colors.lime)
+    statusBox:setBackground(bg or colors.gray)
 end
 
 local function setBuyBtnEnabled(enabled)
@@ -192,7 +170,6 @@ end
 local function detectNearestPlayer()
     local ok, entities = pcall(function() return detector.nearbyEntities() end)
     if not ok or type(entities) ~= "table" then return nil end
-
     local nearest, nearestDist = nil, math.huge
     for _, e in ipairs(entities) do
         if e.isPlayer then
@@ -207,97 +184,82 @@ local function detectNearestPlayer()
 end
 
 local function printTicket(key, nick)
-    if printer.getPaperLevel() < 1 then
-        return false, "No paper in printer!"
-    end
-    if printer.getInkLevel() < 1 then
-        return false, "No ink in printer!"
-    end
-    if not printer.newPage() then
-        return false, "Cannot start printing!"
-    end
+    if printer.getPaperLevel() < 1 then return false, "No paper in printer!" end
+    if printer.getInkLevel() < 1    then return false, "No ink in printer!"   end
+    if not printer.newPage()        then return false, "Cannot start printing!" end
 
     local pw = printer.getPageSize()
-
     printer.setPageTitle(config.TICKET_TITLE)
     printer.setCursorPos(1, 1); printer.write(config.BASE_NAME)
     printer.setCursorPos(1, 2); printer.write(string.rep("=", pw))
     printer.setCursorPos(1, 3); printer.write("Player: " .. nick)
     printer.setCursorPos(1, 4); printer.write("Key:")
     printer.setCursorPos(1, 5); printer.write("  " .. key)
-
     local t = os.date("*t")
-    local dateStr = string.format("%02d/%02d/%04d %02d:%02d",
-        t.day, t.month, t.year, t.hour, t.min)
+    local dateStr = string.format("%02d/%02d/%04d %02d:%02d", t.day, t.month, t.year, t.hour, t.min)
     printer.setCursorPos(1, 6); printer.write("Date: " .. dateStr)
     printer.setCursorPos(1, 7); printer.write(string.rep("-", pw))
     printer.setCursorPos(1, 8); printer.write("Place on pedestal")
     printer.setCursorPos(1, 9); printer.write("at the base entrance")
     printer.setCursorPos(1, 11); printer.write("! SINGLE-USE TICKET !")
-
-    if not printer.endPage() then
-        return false, "Cannot finish printing!"
-    end
+    if not printer.endPage() then return false, "Cannot finish printing!" end
     return true, nil
 end
 
 local function checkEntryConnection()
-    dbg("Pinging entry (ID=" .. config.ENTRY_COMPUTER_ID .. ")...")
     rednet.send(config.ENTRY_COMPUTER_ID, "ping", config.PROTOCOL_PING)
     local senderId, msg = rednet.receive(config.PROTOCOL_PONG, config.REDNET_TIMEOUT)
-    dbg("Ping result: senderId=" .. tostring(senderId) .. " msg=" .. tostring(msg))
     return senderId == config.ENTRY_COMPUTER_ID and msg == "pong"
 end
 
 local function registerTicketAtEntry(key, nick)
-    dbg("Sending ticket: key=" .. key .. " nick=" .. nick)
     local payload = { key = key, nick = nick, time = os.time() }
     rednet.send(config.ENTRY_COMPUTER_ID, payload, config.PROTOCOL_REGISTER)
-    dbg("Waiting for ACK (timeout=" .. config.REDNET_TIMEOUT .. "s)...")
     local senderId, msg = rednet.receive(config.PROTOCOL_ACK, config.REDNET_TIMEOUT)
-    dbg("ACK result: senderId=" .. tostring(senderId) .. " msg=" .. tostring(msg))
-    if senderId == config.ENTRY_COMPUTER_ID and msg == "ok" then
-        return true
-    end
-    return false
+    return senderId == config.ENTRY_COMPUTER_ID and msg == "ok"
 end
 
-local function handlePurchase(nick)
-    state.status = "checking_conn"
-    setBuyBtnEnabled(false)
-    setStatus("Checking entry connection...", colors.yellow)
-    addLog("Checking entry connection...")
-    dbg("handlePurchase: nick=" .. nick)
+local function fetchActiveCount()
+    rednet.send(config.ENTRY_COMPUTER_ID, "count", config.PROTOCOL_COUNT_REQUEST)
+    local senderId, count = rednet.receive(config.PROTOCOL_COUNT_RESPONSE, config.REDNET_TIMEOUT)
+    if senderId == config.ENTRY_COMPUTER_ID and type(count) == "number" then
+        return count
+    end
+    return nil
+end
 
-    local connOk = checkEntryConnection()
-    if not connOk then
+local function refreshActiveLabel()
+    local cnt = fetchActiveCount()
+    activeLabel:setText("Tickets in queue: " .. (cnt ~= nil and tostring(cnt) or "?"))
+end
+
+-- ─── Purchase flow ───────────────────────────────────────────
+local function handlePurchase(nick)
+    state.status = "busy"
+    setBuyBtnEnabled(false)
+    setStatus("Checking connection...", colors.yellow, colors.gray)
+    writeLog("Purchase started for: " .. nick)
+
+    if not checkEntryConnection() then
         state.status = "idle"
         setBuyBtnEnabled(true)
-        setStatus("ERROR: no connection to entry!", colors.red)
-        addLog("ERROR: entry unreachable, payment blocked")
-        dbg("ERROR: entry unreachable, aborting purchase for " .. nick)
+        setStatus("ERROR: entry unreachable!", colors.white, colors.red)
+        writeLog("ERROR: entry unreachable for: " .. nick)
         return
     end
-
-    addLog("Entry connection OK")
-    dbg("Entry reachable, proceeding with payment for " .. nick)
 
     state.status = "waiting_payment"
     cancelRequested = false
     cancelBtn:setVisible(true)
-
     unlockDepositor()
-    setStatus("Insert " .. config.TICKET_PRICE_SPURS .. " spur into Depositor...", colors.yellow)
-    addLog("Waiting for payment: " .. nick)
+    setStatus("Insert " .. config.TICKET_PRICE_SPURS .. " spur into Depositor...", colors.yellow, colors.gray)
+    writeLog("Waiting for payment: " .. nick)
 
-    -- INVERTED signal: no signal on relay input means payment received
     local paid = false
     local deadline = os.clock() + config.PAYMENT_TIMEOUT
-
     while os.clock() < deadline and not cancelRequested do
         if not relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then
-            paid = true
-            break
+            paid = true; break
         end
         os.sleep(0.05)
     end
@@ -308,72 +270,62 @@ local function handlePurchase(nick)
     if cancelRequested then
         state.status = "idle"
         setBuyBtnEnabled(true)
-        setStatus("Order cancelled", colors.orange)
-        addLog("Order cancelled")
+        setStatus("Order cancelled", colors.orange, colors.gray)
+        writeLog("Order cancelled for: " .. nick)
         return
     end
 
     if not paid then
         state.status = "idle"
         setBuyBtnEnabled(true)
-        setStatus("Payment timeout - try again", colors.red)
-        addLog("ERROR: no payment within " .. config.PAYMENT_TIMEOUT .. "s")
+        setStatus("Payment timeout - try again", colors.white, colors.red)
+        writeLog("ERROR: payment timeout for: " .. nick)
         return
     end
 
-    addLog("Payment confirmed!")
-
+    writeLog("Payment confirmed for: " .. nick)
     state.status = "printing"
-    setStatus("Printing ticket...", colors.yellow)
+    setStatus("Printing ticket...", colors.yellow, colors.gray)
 
     local key = uuid.generate()
     local printOk, printErr = printTicket(key, nick)
     if not printOk then
         state.status = "idle"
         setBuyBtnEnabled(true)
-        setStatus("Print error: " .. printErr, colors.red)
-        addLog("ERROR printing: " .. printErr)
+        setStatus("Print error: " .. printErr, colors.white, colors.red)
+        writeLog("ERROR printing for " .. nick .. ": " .. printErr)
         return
     end
 
-    addLog("Printed ticket for: " .. nick)
-
+    writeLog("Ticket printed for: " .. nick)
     state.status = "sending"
-    setStatus("Registering ticket...", colors.yellow)
+    setStatus("Registering ticket...", colors.yellow, colors.gray)
 
-    local regOk = registerTicketAtEntry(key, nick)
-    if not regOk then
+    if not registerTicketAtEntry(key, nick) then
         state.status = "idle"
         setBuyBtnEnabled(true)
-        setStatus("ERROR: no connection to entry!", colors.red)
-        addLog("ERROR: entry did not respond")
-        addLog("Ticket printed but NOT registered!")
+        setStatus("ERROR: entry did not respond!", colors.white, colors.red)
+        writeLog("ERROR: entry ACK failed for " .. nick .. " - ticket NOT registered!")
         return
     end
 
-    state.soldCount     = state.soldCount + 1
-    state.lastTicketKey = key
-    state.lastNick      = nick
-    state.status        = "idle"
-
-    lastKeyLabel:setText(key)
-    lastNickLabel:setText("Player: " .. nick)
-    counterLabel:setText("Sold: " .. state.soldCount)
+    state.soldCount = state.soldCount + 1
+    state.status    = "idle"
+    refreshActiveLabel()
     setBuyBtnEnabled(true)
-    setStatus("Ticket sold! Collect from printer.", colors.lime)
-    addLog("OK: " .. key .. " for " .. nick)
+    setStatus("Ticket sold! Collect from pedestal.", colors.white, colors.lime)
+    writeLog("SOLD: ticket for " .. nick .. " (session total: " .. state.soldCount .. ")")
 end
 
+-- ─── Button handlers ─────────────────────────────────────────
 buyBtn:onClick(function()
     if state.status ~= "idle" then return end
-
     local nick = state.detectedNick
     if not nick then
-        setStatus("No player nearby!", colors.red)
-        addLog("Error: no player detected")
+        setStatus("No player nearby!", colors.white, colors.red)
+        writeLog("Purchase attempt: no player detected")
         return
     end
-
     basalt.schedule(function() handlePurchase(nick) end)
 end)
 
@@ -381,7 +333,8 @@ cancelBtn:onClick(function()
     cancelRequested = true
 end)
 
--- Background loop: update detected player every second
+-- ─── Background tasks ────────────────────────────────────────
+-- Update detected player every second
 basalt.schedule(function()
     while true do
         local nick = detectNearestPlayer()
@@ -397,19 +350,27 @@ basalt.schedule(function()
     end
 end)
 
-setStatus("Ready for sale", colors.lime)
-addLog("Cashier system started")
-addLog("Price: " .. config.TICKET_PRICE_SPURS .. " spur")
-
-dbg("=== CASHIER STARTUP DIAGNOSTICS ===")
-dbg("Computer ID: " .. os.getComputerID())
-dbg("Entry ID in config: " .. config.ENTRY_COMPUTER_ID)
-dbg("Peripherals: " .. table.concat(peripheral.getNames(), ", "))
-for _, name in ipairs(peripheral.getNames()) do
-    if peripheral.getType(name) == "modem" then
-        dbg("Modem '" .. name .. "' isOpen=" .. tostring(rednet.isOpen(name)))
-    end
+-- Animated header: cycle background colors in a loop
+local function startHeaderAnimation()
+    headerLabel:animate()
+        :entries("background", {
+            colors.blue, colors.cyan, colors.lightBlue,
+            colors.blue, colors.purple, colors.blue,
+            colors.cyan, colors.blue
+        }, 4)
+        :onDone(function() startHeaderAnimation() end)
+        :start()
 end
-dbg("===================================")
+basalt.schedule(startHeaderAnimation)
+
+-- Fetch active ticket count from entry on startup
+basalt.schedule(function() refreshActiveLabel() end)
+
+-- ─── Startup ────────────────────────────────────────────────
+setStatus("Ready for sale", colors.lime, colors.gray)
+writeLog("=== CASHIER STARTUP === ID: " .. os.getComputerID()
+    .. " | Entry ID: " .. config.ENTRY_COMPUTER_ID
+    .. " | Price: " .. config.TICKET_PRICE_SPURS .. " spur")
+writeLog("Peripherals: " .. table.concat(peripheral.getNames(), ", "))
 
 basalt.run()

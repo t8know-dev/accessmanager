@@ -182,6 +182,15 @@ local function listenForPings()
     end
 end
 
+local function listenForCountRequests()
+    while true do
+        local senderId, msg = rednet.receive(config.PROTOCOL_COUNT_REQUEST)
+        if senderId == config.KASA_COMPUTER_ID and msg == "count" then
+            rednet.send(senderId, db.count(), config.PROTOCOL_COUNT_RESPONSE)
+        end
+    end
+end
+
 local function scanPedestal()
     while true do
         local item = pedestal.getItemDetail(1)
@@ -208,5 +217,6 @@ monDraw("Waiting...", "Place ticket on pedestal")
 parallel.waitForAll(
     scanPedestal,
     listenForRegistrations,
-    listenForPings
+    listenForPings,
+    listenForCountRequests
 )

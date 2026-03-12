@@ -35,8 +35,11 @@ config.DUMP_CHEST_SIDE = nil
 config.TICKET_PRICE_SPURS = 2
 config.PAYMENT_TIMEOUT    = 60   -- seconds
 
-config.TICKET_TITLE = "Entry Ticket"
+config.TICKET_TITLE = "Thajiggaman's base ticket"
 config.BASE_NAME    = "Thajiggman's base"
+
+config.PROTOCOL_COUNT_REQUEST  = "ticket_count_req"
+config.PROTOCOL_COUNT_RESPONSE = "ticket_count_resp"
 
 config.DOOR_OPEN_SECONDS = 5
 config.REDNET_TIMEOUT    = 10

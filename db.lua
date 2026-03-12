@@ -2,7 +2,7 @@
 
 local db = {}
 
-local DB_FILE = "tickets.db"
+local DB_FILE = "/tickets.db"
 local tickets = {}
 
 function db.load()
@@ -28,13 +28,16 @@ end
 function db.save()
     local f = fs.open(DB_FILE, "w")
     if not f then
-        printError("[DB] Cannot save database!")
+        print("[DB] ERROR: Cannot open " .. DB_FILE .. " for writing!")
         return false
     end
+    local count = 0
     for key, entry in pairs(tickets) do
         f.writeLine(key .. "|" .. entry.nick .. "|" .. tostring(entry.time))
+        count = count + 1
     end
     f.close()
+    print("[DB] Saved " .. count .. " ticket(s) to " .. DB_FILE)
     return true
 end
 
