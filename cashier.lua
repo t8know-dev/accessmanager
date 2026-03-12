@@ -387,7 +387,7 @@ end)
 -- Scrolling info text animation (row 3)
 basalt.schedule(function()
     local msg = "Access to the villager trading hall included!"
-    local padded = msg .. string.rep(" ", W)
+    local padded = msg .. string.rep(" ", 4)
     local offset = 0
     while true do
         local view = padded:sub(offset + 1, offset + W)
