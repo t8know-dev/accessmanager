@@ -388,12 +388,13 @@ end)
 basalt.schedule(function()
     local msg = "Access to the villager trading hall included!"
     local padded = msg .. string.rep(" ", 4)
+    local len = #padded
+    local doubled = padded .. padded
     local offset = 0
     while true do
-        local view = padded:sub(offset + 1, offset + W)
-        if #view < W then view = view .. string.rep(" ", W - #view) end
+        local view = doubled:sub(offset + 1, offset + W)
         scrollLabel:setText(view)
-        offset = (offset + 1) % #padded
+        offset = (offset + 1) % len
         os.sleep(0.15)
     end
 end)
