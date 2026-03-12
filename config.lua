@@ -35,8 +35,7 @@ config.DUMP_CHEST_SIDE = nil
 config.TICKET_PRICE_SPURS = 2
 config.PAYMENT_TIMEOUT    = 60   -- seconds
 
-config.TICKET_TITLE         = "Thajiggaman's base ticket"
-config.CASHIER_PEDESTAL_NAME = "item_pedestal_4"
+config.TICKET_TITLE = "Entry Ticket"
 config.BASE_NAME    = "Thajiggman's base"
 
 config.DOOR_OPEN_SECONDS = 5
