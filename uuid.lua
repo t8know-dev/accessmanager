@@ -1,12 +1,7 @@
--- =============================================================
---  uuid.lua  -  Unique identifier generator
---  Used by the cashier to create ticket IDs
--- =============================================================
+-- uuid.lua - Generates XXXX-XXXX-XXXX ticket keys
 
 local uuid = {}
 
--- Generates a unique key in the format XXXX-XXXX-XXXX
--- Combines os.time(), os.clock() and math.random for uniqueness
 function uuid.generate()
     math.randomseed(os.time() + math.floor(os.clock() * 1000000))
 
@@ -23,7 +18,6 @@ function uuid.generate()
     return seg(4) .. "-" .. seg(4) .. "-" .. seg(4)
 end
 
--- Checks whether a string looks like a valid UUID in our format
 function uuid.isValid(str)
     if type(str) ~= "string" then return false end
     return str:match("^%u%u%u%u%-%u%u%u%u%-%u%u%u%u$") ~= nil
