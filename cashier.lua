@@ -404,10 +404,10 @@ basalt.schedule(function()
     local frames = {
         { bg = colors.blue,      fg = colors.white,  tx = "  * TICKETS *  " },
         { bg = colors.cyan,      fg = colors.yellow,  tx = "  ** TICKETS **  " },
-        { bg = colors.blue,      fg = colors.yellow, tx = "  >   TICKETS   <  " },
-        { bg = colors.blue,      fg = colors.cyan,   tx = "  >>> TICKETS <<<  " },
-        { bg = colors.purple,    fg = colors.white,  tx = "  >>  TICKETS  <<  " },
         { bg = colors.lightBlue, fg = colors.white,  tx = "  *** TICKETS ***  " },
+        { bg = colors.blue,      fg = colors.yellow, tx = "  >   TICKETS   <  " },
+        { bg = colors.purple,    fg = colors.white,  tx = "  >>  TICKETS  <<  " },
+        { bg = colors.blue,      fg = colors.cyan,   tx = "  >>> TICKETS <<<  " },
     }
     local i = 1
     while true do
