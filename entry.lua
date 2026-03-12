@@ -24,6 +24,14 @@ if monitor then
     monitor.setTextScale(1)
 end
 
+local function dbg(msg)
+    local t = os.date("*t")
+    local line = string.format("[%02d:%02d:%02d] %s", t.hour, t.min, t.sec, msg)
+    local prev = term.redirect(term.native())
+    print(line)
+    term.redirect(prev)
+end
+
 do
     local opened = false
     for _, name in ipairs(peripheral.getNames()) do
