@@ -1,12 +1,12 @@
 -- =============================================================
---  wejscie.lua  –  Komputer przy Wejściu  (Komputer #2)
+--  wejscie.lua  –  Komputer przy Wejściu  (computer_388)
 --
---  Peryferia (podłącz do tego komputera):
---    • Item Pedestal          – dowolna strona
---    • Chest (dump)           – dowolna strona (na zużyte bilety)
---    • Modem (wired/wireless) – strona z config.MODEM_SIDE
---    • Redstone               – strona config.DOOR_SIDE → do drzwi
---    • Monitor (opcjonalny)   – wyświetla status przy wejściu
+--  Peryferia:
+--    • Modem (wired)        – strona config.WEJSCIE_MODEM_SIDE
+--      └─ Item Pedestal     – config.PEDESTAL_NAME
+--      └─ Redstone Relay    – config.RELAY_DOOR_NAME (otwieranie bramy)
+--    • Skrzynia dump        – config.DUMP_CHEST_NAME (sieć) lub DUMP_CHEST_SIDE (bezpośrednio)
+--    • Monitor (opcjonalny) – wykrywany przez peripheral.find
 --
 --  Zależności (umieść w tym samym folderze lub /):
 --    • config.lua
@@ -19,32 +19,30 @@ local uuid   = require("uuid")
 local db     = require("db")
 
 -- ──────────────────────────────────────────────────────────────
---  KONFIGURACJA LOKALNA (dostosuj do swojego setupu)
--- ──────────────────────────────────────────────────────────────
-local LOCAL = {
-    DOOR_SIDE    = "back",    -- strona redstone do drzwi/relay
-    PEDESTAL_SIDE = "left",   -- strona lub nazwa peryferialu Item Pedestal
-    DUMP_CHEST   = "right",   -- strona skrzyni na zużyte bilety
-    MONITOR_SIDE = "top",     -- strona monitora (lub nil jeśli brak)
-}
-
--- ──────────────────────────────────────────────────────────────
 --  INICJALIZACJA PERYFERIÓW
 -- ──────────────────────────────────────────────────────────────
-local pedestal = peripheral.find("item_pedestal")
-    or peripheral.wrap(LOCAL.PEDESTAL_SIDE)
-    or error("Item Pedestal nie znaleziony!", 0)
+local pedestal = peripheral.wrap(config.PEDESTAL_NAME)
+    or error("Item Pedestal nie znaleziony: " .. config.PEDESTAL_NAME, 0)
 
-local dumpChest = peripheral.wrap(LOCAL.DUMP_CHEST)
-    or error("Skrzynia dump nie znaleziona na stronie: " .. LOCAL.DUMP_CHEST, 0)
+local dumpChest
+if config.DUMP_CHEST_NAME then
+    dumpChest = peripheral.wrap(config.DUMP_CHEST_NAME)
+        or error("Skrzynia dump nie znaleziona: " .. config.DUMP_CHEST_NAME, 0)
+else
+    dumpChest = peripheral.wrap(config.DUMP_CHEST_SIDE)
+        or error("Skrzynia dump nie znaleziona na stronie: " .. config.DUMP_CHEST_SIDE, 0)
+end
 
-local monitor = nil
-if LOCAL.MONITOR_SIDE and peripheral.isPresent(LOCAL.MONITOR_SIDE) then
-    monitor = peripheral.wrap(LOCAL.MONITOR_SIDE)
+-- Relay otwierania bramy (wejście ustawia OUTPUT)
+local relayDoor = peripheral.wrap(config.RELAY_DOOR_NAME)
+    or error("Relay (door) nie znaleziony: " .. config.RELAY_DOOR_NAME, 0)
+
+local monitor = peripheral.find("monitor")
+if monitor then
     monitor.setTextScale(1)
 end
 
-rednet.open(config.MODEM_SIDE)
+rednet.open(config.WEJSCIE_MODEM_SIDE)
 
 -- ──────────────────────────────────────────────────────────────
 --  BAZA DANYCH (plik lokalny)
@@ -91,9 +89,11 @@ end
 --  STEROWANIE DRZWIAMI
 -- ──────────────────────────────────────────────────────────────
 local function openDoor()
-    redstone.setOutput(LOCAL.DOOR_SIDE, true)
+    relayDoor.setOutput(config.RELAY_DOOR_SIDE1, true)
+    relayDoor.setOutput(config.RELAY_DOOR_SIDE2, true)
     sleep(config.DOOR_OPEN_SECONDS)
-    redstone.setOutput(LOCAL.DOOR_SIDE, false)
+    relayDoor.setOutput(config.RELAY_DOOR_SIDE1, false)
+    relayDoor.setOutput(config.RELAY_DOOR_SIDE2, false)
 end
 
 -- ──────────────────────────────────────────────────────────────

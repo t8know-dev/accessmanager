@@ -1,13 +1,14 @@
 -- =============================================================
---  kasa.lua  –  Komputer Kasy  (Komputer #1)
+--  kasa.lua  –  Komputer Kasy  (computer_391)
 --
---  Peryferia (podłącz do tego komputera):
---    • Brass Depositor       – dowolna strona
---    • CC Printer            – dowolna strona
---    • Modem (wired/wireless)– strona z config.MODEM_SIDE
---    • Entity Detector       – strona z config.DETECTOR_SIDE (lub auto)
---    • Redstone Relay        – strona config.DEPOSITOR_RELAY_SIDE (wyjście → depositor)
---    • Kabel redstone        – strona config.DEPOSITOR_PULSE_SIDE (wejście ← depositor)
+--  Peryferia:
+--    • CC Printer                – lewa strona (config.PRINTER_SIDE)
+--    • Monitor                   – góra (wykrywany przez peripheral.find)
+--    • Modem (wired)             – prawa strona (config.KASA_MODEM_SIDE)
+--      └─ Numismatics_Depositor  – config.DEPOSITOR_NAME
+--      └─ Redstone Relay (puls)  – config.RELAY_DEPOSIT_OUT_NAME  (wejście: puls zapłaty)
+--      └─ Redstone Relay (lock)  – config.RELAY_DEPOSIT_LOCK_NAME (wyjście: blokada depositora)
+--    • Entity Detector           – wykrywany przez peripheral.find (opcjonalny)
 --
 --  Zależności (umieść w tym samym folderze lub /):
 --    • basalt.lua
@@ -15,39 +16,49 @@
 --    • uuid.lua
 -- =============================================================
 
-local basalt = require("basalt")
 local config = require("config")
 local uuid   = require("uuid")
 
 -- ──────────────────────────────────────────────────────────────
+--  PRZEKIEROWANIE NA MONITOR (jeśli podłączony)
+-- ──────────────────────────────────────────────────────────────
+local kasaMonitor = peripheral.find("monitor")
+if kasaMonitor then
+    kasaMonitor.setTextScale(0.5)
+    term.redirect(kasaMonitor)
+end
+
+local basalt = require("basalt")
+
+-- ──────────────────────────────────────────────────────────────
 --  INICJALIZACJA PERYFERIÓW
 -- ──────────────────────────────────────────────────────────────
-local depositor = peripheral.find("brass_depositor")
-    or error("Brass Depositor nie znaleziony!", 0)
+local depositor = peripheral.wrap(config.DEPOSITOR_NAME)
+    or error("Depositor nie znaleziony: " .. config.DEPOSITOR_NAME, 0)
 
-local printer = peripheral.find("printer")
-    or error("Printer nie znaleziony!", 0)
+local printer = peripheral.wrap(config.PRINTER_SIDE)
+    or error("Printer nie znaleziony na stronie: " .. config.PRINTER_SIDE, 0)
 
-local modem = peripheral.wrap(config.MODEM_SIDE)
-    or error("Modem nie znaleziony na stronie: " .. config.MODEM_SIDE, 0)
+-- Relay: blokowanie depositora (kasa ustawia OUTPUT)
+local relayLock = peripheral.wrap(config.RELAY_DEPOSIT_LOCK_NAME)
+    or error("Relay (lock) nie znaleziony: " .. config.RELAY_DEPOSIT_LOCK_NAME, 0)
 
-local detector
-if config.DETECTOR_SIDE then
-    detector = peripheral.wrap(config.DETECTOR_SIDE)
-else
-    detector = peripheral.find("entity_detector")
-end
+-- Relay: puls od depositora po zapłacie (kasa czyta INPUT)
+local relayPulse = peripheral.wrap(config.RELAY_DEPOSIT_OUT_NAME)
+    or error("Relay (pulse) nie znaleziony: " .. config.RELAY_DEPOSIT_OUT_NAME, 0)
+
+local detector = peripheral.find("entity_detector")
 if not detector then
     error("Entity Detector nie znaleziony! Sprawdz polaczenia.", 0)
 end
 
-rednet.open(config.MODEM_SIDE)
+rednet.open(config.KASA_MODEM_SIDE)
 
 -- Ustaw cenę na Depositorze
 depositor.setTotalPrice(config.TICKET_PRICE_SPURS)
 
--- Zablokuj depositor domyślnie (relay ON → sygnał redstone → depositor zablokowany)
-rs.setOutput(config.DEPOSITOR_RELAY_SIDE, true)
+-- Zablokuj depositor domyślnie (relay ON → depositor zablokowany)
+relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)
 
 -- ──────────────────────────────────────────────────────────────
 --  STAN APLIKACJI
@@ -188,11 +199,11 @@ local function setBuyBtnEnabled(enabled)
 end
 
 local function unlockDepositor()
-    rs.setOutput(config.DEPOSITOR_RELAY_SIDE, false)
+    relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, false)   -- relay OFF → depositor aktywny
 end
 
 local function lockDepositor()
-    rs.setOutput(config.DEPOSITOR_RELAY_SIDE, true)
+    relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)    -- relay ON → depositor zablokowany
 end
 
 -- ──────────────────────────────────────────────────────────────
@@ -286,7 +297,8 @@ local function handlePurchase(nick)
     local deadline = os.clock() + config.PAYMENT_TIMEOUT
 
     while os.clock() < deadline and not cancelRequested do
-        if rs.getInput(config.DEPOSITOR_PULSE_SIDE) then
+        -- sygnał INVERTED: brak sygnału na wejściu relay_30 oznacza zapłatę
+        if not relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then
             paid = true
             break
         end
