@@ -41,8 +41,9 @@ config.BASE_NAME    = "Thajiggman's base"
 config.PROTOCOL_COUNT_REQUEST  = "ticket_count_req"
 config.PROTOCOL_COUNT_RESPONSE = "ticket_count_resp"
 
-config.DOOR_OPEN_SECONDS = 5
-config.REDNET_TIMEOUT    = 10
-config.PEDESTAL_POLL_MS  = 0.5
+config.DOOR_OPEN_SECONDS             = 5
+config.REDNET_TIMEOUT                = 10
+config.PEDESTAL_POLL_MS              = 0.5
+config.POST_PURCHASE_DISPLAY_SECONDS = 5
 
 return config

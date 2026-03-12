@@ -212,6 +212,14 @@ local function checkEntryConnection()
     return senderId == config.ENTRY_COMPUTER_ID and msg == "pong"
 end
 
+local function runPreChecks()
+    if printer.getPaperLevel() < 1 then return false, "Printer: no paper!" end
+    if printer.getInkLevel()    < 1 then return false, "Printer: no ink!"   end
+    setStatus("Checking connection...", colors.yellow, colors.gray)
+    if not checkEntryConnection()   then return false, "Entry unreachable!"  end
+    return true, nil
+end
+
 local function registerTicketAtEntry(key, nick)
     local payload = { key = key, nick = nick, time = os.time() }
     rednet.send(config.ENTRY_COMPUTER_ID, payload, config.PROTOCOL_REGISTER)
@@ -234,18 +242,23 @@ local function refreshActiveLabel()
 end
 
 -- ─── Purchase flow ───────────────────────────────────────────
+local function finishPurchase(msg, fg, bg)
+    setStatus(msg, fg, bg or colors.gray)
+    os.sleep(config.POST_PURCHASE_DISPLAY_SECONDS)
+    state.status = "idle"
+    setBuyBtnEnabled(true)
+    setStatus("Ready for sale", colors.lime, colors.gray)
+end
+
 local function handlePurchase(nick)
     state.status = "busy"
     setBuyBtnEnabled(false)
-    setStatus("Checking connection...", colors.yellow, colors.gray)
     writeLog("Purchase started for: " .. nick)
 
-    if not checkEntryConnection() then
-        state.status = "idle"
-        setBuyBtnEnabled(true)
-        setStatus("ERROR: entry unreachable!", colors.white, colors.red)
-        writeLog("ERROR: entry unreachable for: " .. nick)
-        return
+    local checksOk, checksErr = runPreChecks()
+    if not checksOk then
+        writeLog("Pre-check failed for " .. nick .. ": " .. checksErr)
+        return finishPurchase("ERROR: " .. checksErr, colors.white, colors.red)
     end
 
     state.status = "waiting_payment"
@@ -274,19 +287,13 @@ local function handlePurchase(nick)
     cancelBtn:setVisible(false)
 
     if cancelRequested then
-        state.status = "idle"
-        setBuyBtnEnabled(true)
-        setStatus("Order cancelled", colors.orange, colors.gray)
         writeLog("Order cancelled for: " .. nick)
-        return
+        return finishPurchase("Order cancelled", colors.orange, colors.gray)
     end
 
     if not paid then
-        state.status = "idle"
-        setBuyBtnEnabled(true)
-        setStatus("Payment timeout - try again", colors.white, colors.red)
         writeLog("ERROR: payment timeout for: " .. nick)
-        return
+        return finishPurchase("Payment timeout - try again", colors.white, colors.red)
     end
 
     writeLog("Payment confirmed for: " .. nick)
@@ -296,11 +303,8 @@ local function handlePurchase(nick)
     local key = uuid.generate()
     local printOk, printErr = printTicket(key, nick)
     if not printOk then
-        state.status = "idle"
-        setBuyBtnEnabled(true)
-        setStatus("Print error: " .. printErr, colors.white, colors.red)
         writeLog("ERROR printing for " .. nick .. ": " .. printErr)
-        return
+        return finishPurchase("Print error: " .. printErr, colors.white, colors.red)
     end
 
     writeLog("Ticket printed for: " .. nick)
@@ -308,19 +312,14 @@ local function handlePurchase(nick)
     setStatus("Registering ticket...", colors.yellow, colors.gray)
 
     if not registerTicketAtEntry(key, nick) then
-        state.status = "idle"
-        setBuyBtnEnabled(true)
-        setStatus("ERROR: entry did not respond!", colors.white, colors.red)
         writeLog("ERROR: entry ACK failed for " .. nick .. " - ticket NOT registered!")
-        return
+        return finishPurchase("ERROR: entry did not respond!", colors.white, colors.red)
     end
 
     state.soldCount = state.soldCount + 1
-    state.status    = "idle"
     refreshActiveLabel()
-    setBuyBtnEnabled(true)
-    setStatus("Ticket sold! Collect from pedestal.", colors.white, colors.lime)
     writeLog("SOLD: ticket for " .. nick .. " (session total: " .. state.soldCount .. ")")
+    finishPurchase("Ticket sold! Collect from pedestal.", colors.white, colors.lime)
 end
 
 -- ─── Button handlers ─────────────────────────────────────────
@@ -377,11 +376,17 @@ basalt.schedule(function()
     end
 end)
 
--- Fetch active ticket count from entry on startup
-basalt.schedule(function() refreshActiveLabel() end)
-
--- ─── Startup ────────────────────────────────────────────────
-setStatus("Ready for sale", colors.lime, colors.gray)
+-- On startup: fetch ticket count and run pre-checks, then show status
+basalt.schedule(function()
+    refreshActiveLabel()
+    local ok, err = runPreChecks()
+    if ok then
+        setStatus("Ready for sale", colors.lime, colors.gray)
+    else
+        setStatus("SYSTEM ERROR: " .. err, colors.white, colors.red)
+        setBuyBtnEnabled(false)
+    end
+end)
 writeLog("=== CASHIER STARTUP === ID: " .. os.getComputerID()
     .. " | Entry ID: " .. config.ENTRY_COMPUTER_ID
     .. " | Price: " .. config.TICKET_PRICE_SPURS .. " spur")

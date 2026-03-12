@@ -98,13 +98,13 @@ local function verifyAndProcess()
     if not item then return end
 
     if not item.name:find("printed") and not item.name:find("computercraft") then
-        monDraw("! WRONG ITEM !", "This is not a ticket", colors.red)
+        monDraw("reject")
         sleep(2)
-        monDraw("Waiting...", "Place ticket on pedestal")
+        monDraw("idle")
         return
     end
 
-    monDraw("Verifying...", "", colors.yellow)
+    monDraw("idle")
 
     local key = nil
     if item.rawNBT then
@@ -115,18 +115,18 @@ local function verifyAndProcess()
     end
 
     if not key then
-        monDraw("! INVALID !", "No key found in ticket", colors.red)
+        monDraw("reject")
         sleep(3)
-        monDraw("Waiting...", "Place ticket on pedestal")
+        monDraw("idle")
         return
     end
 
     local entry = db.getTicket(key)
 
     if not entry then
-        monDraw("! REJECTED !", "Key: " .. key, colors.red)
+        monDraw("reject")
         sleep(3)
-        monDraw("Waiting...", "Place ticket on pedestal")
+        monDraw("idle")
         return
     end
 
@@ -135,10 +135,10 @@ local function verifyAndProcess()
     db.save()
     destroyTicket()
 
-    monDraw("ENTRY OPEN", "Welcome, " .. entry.nick .. "!", colors.lime)
+    monDraw("ok")
     openDoor()
 
-    monDraw("Waiting...", "Place ticket on pedestal")
+    monDraw("idle")
 end
 
 local function listenForRegistrations()
@@ -158,9 +158,9 @@ local function listenForRegistrations()
             rednet.send(senderId, "ok", config.PROTOCOL_ACK)
             print("[ENTRY] ACK sent")
 
-            monDraw("New ticket!", "For: " .. msg.nick, colors.cyan)
+            monDraw("idle")
             sleep(2)
-            monDraw("Waiting...", "Place ticket on pedestal")
+            monDraw("idle")
         end
     end
 end
@@ -203,7 +203,7 @@ for _, name in ipairs(peripheral.getNames()) do
 end
 print("[ENTRY] Tickets in database: " .. db.count())
 
-monDraw("Waiting...", "Place ticket on pedestal")
+monDraw("idle")
 
 parallel.waitForAll(
     scanPedestal,
