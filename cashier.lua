@@ -32,6 +32,16 @@ rednet.open(config.KASA_MODEM_SIDE)
 depositor.setTotalPrice(config.TICKET_PRICE_SPURS)
 relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)
 
+-- Debug helper: always prints to the native computer terminal,
+-- regardless of monitor redirect.
+local function dbg(msg)
+    local t = os.date("*t")
+    local line = string.format("[%02d:%02d:%02d] %s", t.hour, t.min, t.sec, msg)
+    local prev = term.redirect(term.native())
+    print(line)
+    term.redirect(prev)
+end
+
 local state = {
     status        = "idle",
     lastTicketKey = nil,
@@ -212,10 +222,21 @@ local function printTicket(key, nick)
     return true, nil
 end
 
+local function checkEntryConnection()
+    dbg("Pinging entry (ID=" .. config.ENTRY_COMPUTER_ID .. ")...")
+    rednet.send(config.ENTRY_COMPUTER_ID, "ping", config.PROTOCOL_PING)
+    local senderId, msg = rednet.receive(config.PROTOCOL_PONG, config.REDNET_TIMEOUT)
+    dbg("Ping result: senderId=" .. tostring(senderId) .. " msg=" .. tostring(msg))
+    return senderId == config.ENTRY_COMPUTER_ID and msg == "pong"
+end
+
 local function registerTicketAtEntry(key, nick)
+    dbg("Sending ticket: key=" .. key .. " nick=" .. nick)
     local payload = { key = key, nick = nick, time = os.time() }
     rednet.send(config.ENTRY_COMPUTER_ID, payload, config.PROTOCOL_REGISTER)
+    dbg("Waiting for ACK (timeout=" .. config.REDNET_TIMEOUT .. "s)...")
     local senderId, msg = rednet.receive(config.PROTOCOL_ACK, config.REDNET_TIMEOUT)
+    dbg("ACK result: senderId=" .. tostring(senderId) .. " msg=" .. tostring(msg))
     if senderId == config.ENTRY_COMPUTER_ID and msg == "ok" then
         return true
     end
@@ -223,9 +244,27 @@ local function registerTicketAtEntry(key, nick)
 end
 
 local function handlePurchase(nick)
+    state.status = "checking_conn"
+    setBuyBtnEnabled(false)
+    setStatus("Checking entry connection...", colors.yellow)
+    addLog("Checking entry connection...")
+    dbg("handlePurchase: nick=" .. nick)
+
+    local connOk = checkEntryConnection()
+    if not connOk then
+        state.status = "idle"
+        setBuyBtnEnabled(true)
+        setStatus("ERROR: no connection to entry!", colors.red)
+        addLog("ERROR: entry unreachable, payment blocked")
+        dbg("ERROR: entry unreachable, aborting purchase for " .. nick)
+        return
+    end
+
+    addLog("Entry connection OK")
+    dbg("Entry reachable, proceeding with payment for " .. nick)
+
     state.status = "waiting_payment"
     cancelRequested = false
-    setBuyBtnEnabled(false)
     cancelBtn:setVisible(true)
 
     unlockDepositor()

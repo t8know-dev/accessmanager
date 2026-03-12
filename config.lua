@@ -7,6 +7,8 @@ config.ENTRY_COMPUTER_ID = 388   -- entry computer
 
 config.PROTOCOL_REGISTER = "ticket_register"
 config.PROTOCOL_ACK      = "ticket_ack"
+config.PROTOCOL_PING     = "ticket_ping"
+config.PROTOCOL_PONG     = "ticket_pong"
 
 config.KASA_MODEM_SIDE    = "right"
 config.WEJSCIE_MODEM_SIDE = "left"

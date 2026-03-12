@@ -147,14 +147,26 @@ local function listenForRegistrations()
             and type(msg) == "table"
             and msg.key and msg.nick
         then
+            print(string.format("[ENTRY] Register: key=%s nick=%s from=%d",
+                tostring(msg.key), tostring(msg.nick), senderId))
             db.addTicket(msg.key, msg.nick, msg.time)
             db.save()
+            print("[ENTRY] Saved to DB, sending ACK...")
             rednet.send(senderId, "ok", config.PROTOCOL_ACK)
+            print("[ENTRY] ACK sent")
 
             monDraw("New ticket!", "For: " .. msg.nick, colors.cyan)
             sleep(2)
             monDraw("Waiting...", "Place ticket on pedestal")
         end
+    end
+end
+
+local function listenForPings()
+    while true do
+        local senderId, msg = rednet.receive(config.PROTOCOL_PING)
+        print(string.format("[ENTRY] Ping from %d, sending pong", senderId))
+        rednet.send(senderId, "pong", config.PROTOCOL_PONG)
     end
 end
 
@@ -175,5 +187,6 @@ monDraw("Waiting...", "Place ticket on pedestal")
 
 parallel.waitForAll(
     scanPedestal,
-    listenForRegistrations
+    listenForRegistrations,
+    listenForPings
 )
