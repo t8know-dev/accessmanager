@@ -255,6 +255,22 @@ local function handlePurchase(nick)
     setStatus("Insert " .. config.TICKET_PRICE_SPURS .. " spur into Depositor...", colors.yellow, colors.gray)
     writeLog("Waiting for payment: " .. nick)
 
+    -- Wait for depositor to activate: relay must go HIGH before we start watching for LOW (paid)
+    local activateDeadline = os.clock() + 3
+    while os.clock() < activateDeadline do
+        if relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then break end
+        os.sleep(0.05)
+    end
+    if not relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then
+        lockDepositor()
+        cancelBtn:setVisible(false)
+        state.status = "idle"
+        setBuyBtnEnabled(true)
+        setStatus("Depositor not ready!", colors.white, colors.red)
+        writeLog("ERROR: depositor did not activate for: " .. nick)
+        return
+    end
+
     local paid = false
     local deadline = os.clock() + config.PAYMENT_TIMEOUT
     while os.clock() < deadline and not cancelRequested do
@@ -350,17 +366,23 @@ basalt.schedule(function()
     end
 end)
 
--- Animated header: cycle background colors in a loop
+-- Animated header: cycle frames to force Basalt re-render (setText triggers render)
 basalt.schedule(function()
-    local bgColors = {
-        colors.blue, colors.cyan, colors.lightBlue,
-        colors.blue, colors.purple, colors.blue,
-        colors.cyan, colors.blue,
+    local frames = {
+        { bg = colors.blue,      fg = colors.white,  tx = "  *** TICKETS ***  " },
+        { bg = colors.cyan,      fg = colors.black,  tx = "  >>> TICKETS <<<  " },
+        { bg = colors.lightBlue, fg = colors.white,  tx = "  *** TICKETS ***  " },
+        { bg = colors.blue,      fg = colors.yellow, tx = "  *   TICKETS   *  " },
+        { bg = colors.purple,    fg = colors.white,  tx = "  *** TICKETS ***  " },
+        { bg = colors.blue,      fg = colors.cyan,   tx = "  >>> TICKETS <<<  " },
     }
     local i = 1
     while true do
-        headerLabel:setBackground(bgColors[i])
-        i = (i % #bgColors) + 1
+        local f = frames[i]
+        headerLabel:setBackground(f.bg)
+        headerLabel:setForeground(f.fg)
+        headerLabel:setText(padCenter(f.tx, W))
+        i = (i % #frames) + 1
         os.sleep(0.5)
     end
 end)

@@ -26,18 +26,24 @@ function db.load()
 end
 
 function db.save()
+    -- Build full content in memory first, then write atomically
+    local lines = {}
+    for key, entry in pairs(tickets) do
+        table.insert(lines, key .. "|" .. entry.nick .. "|" .. tostring(entry.time))
+    end
+    local content = table.concat(lines, "\n")
+    if #lines > 0 then content = content .. "\n" end
+
     local f = fs.open(DB_FILE, "w")
     if not f then
         print("[DB] ERROR: Cannot open " .. DB_FILE .. " for writing!")
         return false
     end
-    local count = 0
-    for key, entry in pairs(tickets) do
-        f.writeLine(key .. "|" .. entry.nick .. "|" .. tostring(entry.time))
-        count = count + 1
-    end
+    f.write(content)
+    f.flush()
     f.close()
-    print("[DB] Saved " .. count .. " ticket(s) to " .. DB_FILE)
+    print("[DB] Saved " .. #lines .. " ticket(s) to " .. DB_FILE
+        .. " (" .. #content .. " bytes)")
     return true
 end
 
