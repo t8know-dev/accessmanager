@@ -24,7 +24,19 @@ if monitor then
     monitor.setTextScale(1)
 end
 
-rednet.open(config.WEJSCIE_MODEM_SIDE)
+do
+    local opened = false
+    for _, name in ipairs(peripheral.getNames()) do
+        if peripheral.getType(name) == "modem" then
+            rednet.open(name)
+            print("[ENTRY] Opened modem: " .. name .. " (isOpen=" .. tostring(rednet.isOpen(name)) .. ")")
+            opened = true
+        end
+    end
+    if not opened then
+        error("[ENTRY] No modem found! Check connections.", 0)
+    end
+end
 db.load()
 
 local function monDraw(line1, line2, col)

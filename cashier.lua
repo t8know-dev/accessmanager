@@ -28,7 +28,19 @@ if not detector then
     error("Entity Detector not found! Check connections.", 0)
 end
 
-rednet.open(config.KASA_MODEM_SIDE)
+do
+    local opened = false
+    for _, name in ipairs(peripheral.getNames()) do
+        if peripheral.getType(name) == "modem" then
+            rednet.open(name)
+            print("[CASHIER] Opened modem: " .. name .. " (isOpen=" .. tostring(rednet.isOpen(name)) .. ")")
+            opened = true
+        end
+    end
+    if not opened then
+        error("[CASHIER] No modem found! Check connections.", 0)
+    end
+end
 depositor.setTotalPrice(config.TICKET_PRICE_SPURS)
 relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)
 
