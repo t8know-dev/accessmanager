@@ -351,17 +351,19 @@ basalt.schedule(function()
 end)
 
 -- Animated header: cycle background colors in a loop
-local function startHeaderAnimation()
-    headerLabel:animate()
-        :entries("background", {
-            colors.blue, colors.cyan, colors.lightBlue,
-            colors.blue, colors.purple, colors.blue,
-            colors.cyan, colors.blue
-        }, 4)
-        :onDone(function() startHeaderAnimation() end)
-        :start()
-end
-basalt.schedule(startHeaderAnimation)
+basalt.schedule(function()
+    local bgColors = {
+        colors.blue, colors.cyan, colors.lightBlue,
+        colors.blue, colors.purple, colors.blue,
+        colors.cyan, colors.blue,
+    }
+    local i = 1
+    while true do
+        headerLabel:setBackground(bgColors[i])
+        i = (i % #bgColors) + 1
+        os.sleep(0.5)
+    end
+end)
 
 -- Fetch active ticket count from entry on startup
 basalt.schedule(function() refreshActiveLabel() end)
