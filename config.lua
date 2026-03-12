@@ -3,7 +3,7 @@
 local config = {}
 
 config.KASA_COMPUTER_ID  = 796   -- cashier computer
-config.ENTRY_COMPUTER_ID = 388   -- entry computer
+config.ENTRY_COMPUTER_ID = 797   -- entry computer
 
 config.PROTOCOL_REGISTER = "ticket_register"
 config.PROTOCOL_ACK      = "ticket_ack"
