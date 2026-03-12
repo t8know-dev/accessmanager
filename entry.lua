@@ -1,17 +1,17 @@
 -- =============================================================
---  wejscie.lua  –  Komputer przy Wejściu  (computer_388)
+--  entry.lua  -  Entry Computer  (computer_388)
 --
---  Peryferia:
---    • Modem (wired)        – strona config.WEJSCIE_MODEM_SIDE
---      └─ Item Pedestal     – config.PEDESTAL_NAME
---      └─ Redstone Relay    – config.RELAY_DOOR_NAME (otwieranie bramy)
---    • Skrzynia dump        – config.DUMP_CHEST_NAME (sieć) lub DUMP_CHEST_SIDE (bezpośrednio)
---    • Monitor (opcjonalny) – wykrywany przez peripheral.find
+--  Peripherals:
+--    * Modem (wired)        - side config.WEJSCIE_MODEM_SIDE
+--      L- Item Pedestal     - config.PEDESTAL_NAME
+--      L- Redstone Relay    - config.RELAY_DOOR_NAME (door opening)
+--    * Dump chest           - config.DUMP_CHEST_NAME (network) or DUMP_CHEST_SIDE (direct)
+--    * Monitor (optional)   - detected via peripheral.find
 --
---  Zależności (umieść w tym samym folderze lub /):
---    • config.lua
---    • uuid.lua
---    • db.lua
+--  Dependencies (place in the same folder or /):
+--    * config.lua
+--    * uuid.lua
+--    * db.lua
 -- =============================================================
 
 local config = require("config")
@@ -19,23 +19,23 @@ local uuid   = require("uuid")
 local db     = require("db")
 
 -- ──────────────────────────────────────────────────────────────
---  INICJALIZACJA PERYFERIÓW
+--  PERIPHERAL INITIALISATION
 -- ──────────────────────────────────────────────────────────────
 local pedestal = peripheral.wrap(config.PEDESTAL_NAME)
-    or error("Item Pedestal nie znaleziony: " .. config.PEDESTAL_NAME, 0)
+    or error("Item Pedestal not found: " .. config.PEDESTAL_NAME, 0)
 
 local dumpChest
 if config.DUMP_CHEST_NAME then
     dumpChest = peripheral.wrap(config.DUMP_CHEST_NAME)
-        or error("Skrzynia dump nie znaleziona: " .. config.DUMP_CHEST_NAME, 0)
+        or error("Dump chest not found: " .. config.DUMP_CHEST_NAME, 0)
 else
     dumpChest = peripheral.wrap(config.DUMP_CHEST_SIDE)
-        or error("Skrzynia dump nie znaleziona na stronie: " .. config.DUMP_CHEST_SIDE, 0)
+        or error("Dump chest not found on side: " .. config.DUMP_CHEST_SIDE, 0)
 end
 
--- Relay otwierania bramy (wejście ustawia OUTPUT)
+-- Relay for door opening (entry computer sets OUTPUT)
 local relayDoor = peripheral.wrap(config.RELAY_DOOR_NAME)
-    or error("Relay (door) nie znaleziony: " .. config.RELAY_DOOR_NAME, 0)
+    or error("Relay (door) not found: " .. config.RELAY_DOOR_NAME, 0)
 
 local monitor = peripheral.find("monitor")
 if monitor then
@@ -45,12 +45,12 @@ end
 rednet.open(config.WEJSCIE_MODEM_SIDE)
 
 -- ──────────────────────────────────────────────────────────────
---  BAZA DANYCH (plik lokalny)
+--  DATABASE (local file)
 -- ──────────────────────────────────────────────────────────────
 db.load()
 
 -- ──────────────────────────────────────────────────────────────
---  WYŚWIETLACZ MONITORA
+--  MONITOR DISPLAY
 -- ──────────────────────────────────────────────────────────────
 local function monDraw(line1, line2, col)
     if not monitor then return end
@@ -65,28 +65,28 @@ local function monDraw(line1, line2, col)
         monitor.write(text)
     end
 
-    -- Nagłówek
+    -- Header
     monitor.setBackgroundColor(colors.blue)
     for y = 1, 2 do
         monitor.setCursorPos(1, y)
         monitor.write(string.rep(" ", mw))
     end
     mCenter(1, config.BASE_NAME, colors.white, colors.blue)
-    mCenter(2, "WEJSCIE", colors.yellow, colors.blue)
+    mCenter(2, "ENTRY", colors.yellow, colors.blue)
 
     monitor.setBackgroundColor(colors.black)
 
-    -- Główna wiadomość
+    -- Main message
     mCenter(math.floor(mh / 2),     line1 or "", col or colors.white)
     mCenter(math.floor(mh / 2) + 1, line2 or "", colors.lightGray)
 
-    -- Instrukcja na dole
-    mCenter(mh - 1, "Poloz bilet na pedestalu", colors.gray)
-    mCenter(mh,     "aby otworzyc wejscie",     colors.gray)
+    -- Instruction at bottom
+    mCenter(mh - 1, "Place ticket on pedestal", colors.gray)
+    mCenter(mh,     "to open the entry",        colors.gray)
 end
 
 -- ──────────────────────────────────────────────────────────────
---  STEROWANIE DRZWIAMI
+--  DOOR CONTROL
 -- ──────────────────────────────────────────────────────────────
 local function openDoor()
     relayDoor.setOutput(config.RELAY_DOOR_SIDE1, true)
@@ -97,20 +97,20 @@ local function openDoor()
 end
 
 -- ──────────────────────────────────────────────────────────────
---  PARSOWANIE NBT BILETU
+--  TICKET NBT PARSING
 -- ──────────────────────────────────────────────────────────────
--- Printed Page w CC przechowuje tekst w NBT jako:
---   pages = [ "linia1\nlinia2\n..." ]
--- Szukamy linii z kluczem (format XXXX-XXXX-XXXX)
+-- Printed Page in CC stores text in NBT as:
+--   pages = [ "line1\nline2\n..." ]
+-- We look for a line containing the key (format XXXX-XXXX-XXXX)
 local function extractKeyFromNBT(rawNBT)
     if type(rawNBT) ~= "table" then return nil end
 
-    -- rawNBT może być zagnieżdżoną tabelą
+    -- rawNBT can be a nested table
     local function searchTable(t, depth)
         if depth > 5 then return nil end
         for k, v in pairs(t) do
             if type(v) == "string" then
-                -- Szukaj wzorca UUID w każdym stringu
+                -- Search for UUID pattern in every string
                 local found = v:match("([A-Z0-9][A-Z0-9][A-Z0-9][A-Z0-9]%-[A-Z0-9][A-Z0-9][A-Z0-9][A-Z0-9]%-[A-Z0-9][A-Z0-9][A-Z0-9][A-Z0-9])")
                 if found then return found end
             elseif type(v) == "table" then
@@ -125,82 +125,82 @@ local function extractKeyFromNBT(rawNBT)
 end
 
 -- ──────────────────────────────────────────────────────────────
---  NISZCZENIE BILETU (przeniesienie do dump chest)
+--  TICKET DESTRUCTION (move to dump chest)
 -- ──────────────────────────────────────────────────────────────
 local function destroyTicket()
-    -- Pedestal ma inventory API – slot 1 to wystawiony przedmiot
+    -- Pedestal has inventory API - slot 1 is the displayed item
     local pedestalName = peripheral.getName(pedestal)
     local dumpName     = peripheral.getName(dumpChest)
 
-    -- Przesuń ze slot 1 pedestalu do skrzyni dump
+    -- Move from pedestal slot 1 to dump chest
     local moved = pedestal.pushItems(dumpName, 1)
     return moved > 0
 end
 
 -- ──────────────────────────────────────────────────────────────
---  WERYFIKACJA BILETU
+--  TICKET VERIFICATION
 -- ──────────────────────────────────────────────────────────────
 local function verifyAndProcess()
-    -- Sprawdź czy coś jest na pedestalu
+    -- Check if something is on the pedestal
     local item = pedestal.getItemDetail(1)
     if not item then return end
 
-    -- Sprawdź typ przedmiotu (Printed Page z CC:Tweaked)
+    -- Check item type (Printed Page from CC:Tweaked)
     if not item.name:find("printed") and not item.name:find("computercraft") then
-        monDraw("! ZLY PRZEDMIOT !", "To nie jest bilet", colors.red)
+        monDraw("! WRONG ITEM !", "This is not a ticket", colors.red)
         sleep(2)
-        monDraw("Oczekiwanie...", "Poloz bilet na pedestalu")
+        monDraw("Waiting...", "Place ticket on pedestal")
         return
     end
 
-    monDraw("Weryfikacja...", "", colors.yellow)
+    monDraw("Verifying...", "", colors.yellow)
 
-    -- Wyciągnij klucz z NBT
+    -- Extract key from NBT
     local key = nil
     if item.rawNBT then
         key = extractKeyFromNBT(item.rawNBT)
     end
 
-    -- Fallback: spróbuj z displayName lub tag
+    -- Fallback: try displayName or tag
     if not key and item.displayName then
         key = item.displayName:match("([A-Z0-9][A-Z0-9][A-Z0-9][A-Z0-9]%-[A-Z0-9][A-Z0-9][A-Z0-9][A-Z0-9]%-[A-Z0-9][A-Z0-9][A-Z0-9][A-Z0-9])")
     end
 
     if not key then
-        monDraw("! NIEPRAWIDLOWY !", "Brak klucza w bilecie", colors.red)
+        monDraw("! INVALID !", "No key found in ticket", colors.red)
         sleep(3)
-        monDraw("Oczekiwanie...", "Poloz bilet na pedestalu")
+        monDraw("Waiting...", "Place ticket on pedestal")
         return
     end
 
-    -- Sprawdź w bazie danych
+    -- Check in database
     local entry = db.getTicket(key)
 
     if not entry then
-        monDraw("! ODRZUCONY !", "Klucz: " .. key, colors.red)
+        monDraw("! REJECTED !", "Key: " .. key, colors.red)
         sleep(3)
-        monDraw("Oczekiwanie...", "Poloz bilet na pedestalu")
+        monDraw("Waiting...", "Place ticket on pedestal")
         return
     end
 
-    -- Bilet ważny – usuń z bazy (jednorazowy!)
+    -- Valid ticket - remove from database (single-use!)
     db.removeTicket(key)
     db.save()
 
-    -- Usuń fizyczny bilet z pedestalu
+    -- Remove physical ticket from pedestal
     local destroyed = destroyTicket()
 
-    -- Otwórz drzwi
-    monDraw("WEJSCIE OTWARTE", "Witaj, " .. entry.nick .. "!", colors.lime)
+    -- Open door
+    monDraw("ENTRY OPEN", "Welcome, " .. entry.nick .. "!", colors.lime)
 
-    -- Otwórz drzwi (blokuje przez DOOR_OPEN_SECONDS)
+    -- Open door (blocks for DOOR_OPEN_SECONDS)
     openDoor()
 
-    monDraw("Oczekiwanie...", "Poloz bilet na pedestalu")
+    monDraw("Waiting...", "Place ticket on pedestal")
 end
 
 -- ──────────────────────────────────────────────────────────────
---  NASŁUCHIWANIE NA REJESTRACJĘ BILETÓW (z kasy)
+--  LISTEN FOR TICKET REGISTRATIONS (from cashier)
 -- ──────────────────────────────────────────────────────────────
 local function listenForRegistrations()
     while true do
@@ -211,23 +211,23 @@ local function listenForRegistrations()
             and type(msg) == "table"
             and msg.key and msg.nick
         then
-            -- Zarejestruj bilet w bazie
+            -- Register ticket in database
             db.addTicket(msg.key, msg.nick, msg.time)
             db.save()
 
-            -- Wyślij ACK
+            -- Send ACK
             rednet.send(senderId, "ok", config.PROTOCOL_ACK)
 
-            -- Pokaż na monitorze chwilowo
-            monDraw("Nowy bilet!", "Dla: " .. msg.nick, colors.cyan)
+            -- Show on monitor briefly
+            monDraw("New ticket!", "For: " .. msg.nick, colors.cyan)
             sleep(2)
-            monDraw("Oczekiwanie...", "Poloz bilet na pedestalu")
+            monDraw("Waiting...", "Place ticket on pedestal")
         end
     end
 end
 
 -- ──────────────────────────────────────────────────────────────
---  PĘTLA SKANOWANIA PEDESTALU
+--  PEDESTAL SCAN LOOP
 -- ──────────────────────────────────────────────────────────────
 local function scanPedestal()
     while true do
@@ -242,13 +242,13 @@ end
 -- ──────────────────────────────────────────────────────────────
 --  START
 -- ──────────────────────────────────────────────────────────────
-print("[WEJSCIE] System uruchomiony")
-print("[WEJSCIE] Biletow w bazie: " .. db.count())
-print("[WEJSCIE] Czekam na bilety i rejestracje...")
+print("[ENTRY] System started")
+print("[ENTRY] Tickets in database: " .. db.count())
+print("[ENTRY] Waiting for tickets and registrations...")
 
-monDraw("Oczekiwanie...", "Poloz bilet na pedestalu")
+monDraw("Waiting...", "Place ticket on pedestal")
 
--- Uruchom obie pętle równolegle
+-- Run both loops in parallel
 parallel.waitForAll(
     scanPedestal,
     listenForRegistrations

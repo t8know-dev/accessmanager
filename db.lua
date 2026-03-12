@@ -1,18 +1,18 @@
 -- =============================================================
---  db.lua  –  Baza Danych Biletów (dla komputera Wejście)
+--  db.lua  -  Ticket Database (for Entry computer)
 --
---  Przechowuje ważne klucze biletów w pliku JSON na dysku.
---  Bilet jest jednorazowy – po użyciu jest usuwany z bazy.
+--  Stores valid ticket keys in a file on disk.
+--  Tickets are single-use - removed from the database after use.
 -- =============================================================
 
 local db = {}
 
 local DB_FILE = "tickets.db"
 
--- Wewnętrzna tablica biletów: { [key] = { nick, time } }
+-- Internal ticket table: { [key] = { nick, time } }
 local tickets = {}
 
--- ── Wczytaj bazę z pliku ──────────────────────────────────────
+-- ── Load database from file ───────────────────────────────────
 function db.load()
     if not fs.exists(DB_FILE) then
         tickets = {}
@@ -29,7 +29,7 @@ function db.load()
     f.close()
 
     if content and content ~= "" then
-        -- Prosty format: jedna linia = jeden bilet
+        -- Simple format: one line = one ticket
         -- FORMAT: KEY|NICK|TIME
         tickets = {}
         for line in content:gmatch("[^\n]+") do
@@ -46,11 +46,11 @@ function db.load()
     end
 end
 
--- ── Zapisz bazę do pliku ──────────────────────────────────────
+-- ── Save database to file ─────────────────────────────────────
 function db.save()
     local f = fs.open(DB_FILE, "w")
     if not f then
-        printError("[DB] Nie mozna zapisac bazy danych!")
+        printError("[DB] Cannot save database!")
         return false
     end
 
@@ -62,7 +62,7 @@ function db.save()
     return true
 end
 
--- ── Dodaj bilet ───────────────────────────────────────────────
+-- ── Add ticket ────────────────────────────────────────────────
 function db.addTicket(key, nick, time)
     tickets[key] = {
         nick = nick,
@@ -70,24 +70,24 @@ function db.addTicket(key, nick, time)
     }
 end
 
--- ── Pobierz bilet (lub nil jeśli nie istnieje) ────────────────
+-- ── Get ticket (or nil if not found) ─────────────────────────
 function db.getTicket(key)
     return tickets[key]
 end
 
--- ── Usuń bilet (po użyciu) ────────────────────────────────────
+-- ── Remove ticket (after use) ─────────────────────────────────
 function db.removeTicket(key)
     tickets[key] = nil
 end
 
--- ── Ile biletów w bazie ───────────────────────────────────────
+-- ── Count tickets in database ─────────────────────────────────
 function db.count()
     local n = 0
     for _ in pairs(tickets) do n = n + 1 end
     return n
 end
 
--- ── Lista wszystkich biletów (do debugowania) ─────────────────
+-- ── List all tickets (for debugging) ─────────────────────────
 function db.listAll()
     local list = {}
     for key, entry in pairs(tickets) do
@@ -100,7 +100,7 @@ function db.listAll()
     return list
 end
 
--- ── Wyczyść wszystkie bilety ──────────────────────────────────
+-- ── Clear all tickets ─────────────────────────────────────────
 function db.clear()
     tickets = {}
 end

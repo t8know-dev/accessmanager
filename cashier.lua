@@ -1,26 +1,26 @@
 -- =============================================================
---  kasa.lua  –  Komputer Kasy  (computer_391)
+--  cashier.lua  -  Cashier Computer  (computer_391)
 --
---  Peryferia:
---    • CC Printer                – lewa strona (config.PRINTER_SIDE)
---    • Monitor                   – góra (wykrywany przez peripheral.find)
---    • Modem (wired)             – prawa strona (config.KASA_MODEM_SIDE)
---      └─ Numismatics_Depositor  – config.DEPOSITOR_NAME
---      └─ Redstone Relay (puls)  – config.RELAY_DEPOSIT_OUT_NAME  (wejście: puls zapłaty)
---      └─ Redstone Relay (lock)  – config.RELAY_DEPOSIT_LOCK_NAME (wyjście: blokada depositora)
---    • Entity Detector           – wykrywany przez peripheral.find (opcjonalny)
+--  Peripherals:
+--    * CC Printer                - left side (config.PRINTER_SIDE)
+--    * Monitor                   - top (detected via peripheral.find)
+--    * Modem (wired)             - right side (config.KASA_MODEM_SIDE)
+--      L- Numismatics_Depositor  - config.DEPOSITOR_NAME
+--      L- Redstone Relay (pulse) - config.RELAY_DEPOSIT_OUT_NAME  (input: payment pulse)
+--      L- Redstone Relay (lock)  - config.RELAY_DEPOSIT_LOCK_NAME (output: depositor lock)
+--    * Entity Detector           - detected via peripheral.find (optional)
 --
---  Zależności (umieść w tym samym folderze lub /):
---    • basalt.lua
---    • config.lua
---    • uuid.lua
+--  Dependencies (place in the same folder or /):
+--    * basalt.lua
+--    * config.lua
+--    * uuid.lua
 -- =============================================================
 
 local config = require("config")
 local uuid   = require("uuid")
 
 -- ──────────────────────────────────────────────────────────────
---  PRZEKIEROWANIE NA MONITOR (jeśli podłączony)
+--  REDIRECT TO MONITOR (if connected)
 -- ──────────────────────────────────────────────────────────────
 local kasaMonitor = peripheral.find("monitor")
 if kasaMonitor then
@@ -31,37 +31,37 @@ end
 local basalt = require("basalt")
 
 -- ──────────────────────────────────────────────────────────────
---  INICJALIZACJA PERYFERIÓW
+--  PERIPHERAL INITIALISATION
 -- ──────────────────────────────────────────────────────────────
 local depositor = peripheral.wrap(config.DEPOSITOR_NAME)
-    or error("Depositor nie znaleziony: " .. config.DEPOSITOR_NAME, 0)
+    or error("Depositor not found: " .. config.DEPOSITOR_NAME, 0)
 
 local printer = peripheral.wrap(config.PRINTER_SIDE)
-    or error("Printer nie znaleziony na stronie: " .. config.PRINTER_SIDE, 0)
+    or error("Printer not found on side: " .. config.PRINTER_SIDE, 0)
 
--- Relay: blokowanie depositora (kasa ustawia OUTPUT)
+-- Relay: depositor lock (cashier sets OUTPUT)
 local relayLock = peripheral.wrap(config.RELAY_DEPOSIT_LOCK_NAME)
-    or error("Relay (lock) nie znaleziony: " .. config.RELAY_DEPOSIT_LOCK_NAME, 0)
+    or error("Relay (lock) not found: " .. config.RELAY_DEPOSIT_LOCK_NAME, 0)
 
--- Relay: puls od depositora po zapłacie (kasa czyta INPUT)
+-- Relay: pulse from depositor after payment (cashier reads INPUT)
 local relayPulse = peripheral.wrap(config.RELAY_DEPOSIT_OUT_NAME)
-    or error("Relay (pulse) nie znaleziony: " .. config.RELAY_DEPOSIT_OUT_NAME, 0)
+    or error("Relay (pulse) not found: " .. config.RELAY_DEPOSIT_OUT_NAME, 0)
 
 local detector = peripheral.find("entity_detector")
 if not detector then
-    error("Entity Detector nie znaleziony! Sprawdz polaczenia.", 0)
+    error("Entity Detector not found! Check connections.", 0)
 end
 
 rednet.open(config.KASA_MODEM_SIDE)
 
--- Ustaw cenę na Depositorze
+-- Set price on Depositor
 depositor.setTotalPrice(config.TICKET_PRICE_SPURS)
 
--- Zablokuj depositor domyślnie (relay ON → depositor zablokowany)
+-- Lock depositor by default (relay ON -> depositor locked)
 relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)
 
 -- ──────────────────────────────────────────────────────────────
---  STAN APLIKACJI
+--  APPLICATION STATE
 -- ──────────────────────────────────────────────────────────────
 local state = {
     status        = "idle",
@@ -69,61 +69,61 @@ local state = {
     lastNick      = nil,
     soldCount     = 0,
     logLines      = {},
-    detectedNick  = nil,   -- nick wykryty przez entity detector
+    detectedNick  = nil,   -- nick detected by entity detector
     purchasing    = false,
 }
 
 local cancelRequested = false
 
 -- ──────────────────────────────────────────────────────────────
---  UI – BASALT
+--  UI - BASALT
 -- ──────────────────────────────────────────────────────────────
 local main = basalt.getMainFrame()
 main:setBackground(colors.black)
 
 local W, H = term.getSize()
 
--- ── Nagłówek ─────────────────────────────────────────────────
+-- ── Header ───────────────────────────────────────────────────
 main:addLabel()
-    :setText(" " .. config.BASE_NAME .. " – KASA BILETOWA ")
+    :setText(" " .. config.BASE_NAME .. " - TICKET BOOTH ")
     :setPosition(1, 1)
     :setSize(W, 1)
     :setBackground(colors.blue)
     :setForeground(colors.white)
 
--- ── Info cennik ──────────────────────────────────────────────
+-- ── Price info ───────────────────────────────────────────────
 main:addLabel()
-    :setText("Bilet jednorazowy: " .. config.TICKET_PRICE_SPURS .. " spur")
+    :setText("Single-use ticket: " .. config.TICKET_PRICE_SPURS .. " spur")
     :setPosition(2, 3)
     :setForeground(colors.yellow)
 
 -- ── Status box ───────────────────────────────────────────────
 local statusBox = main:addLabel()
-    :setText("[ Oczekiwanie ]")
+    :setText("[ Waiting ]")
     :setPosition(2, 5)
     :setSize(W - 2, 1)
     :setForeground(colors.lime)
 
--- ── Wykryty gracz ────────────────────────────────────────────
+-- ── Detected player ──────────────────────────────────────────
 main:addLabel()
-    :setText("Wykryty gracz:")
+    :setText("Detected player:")
     :setPosition(2, 7)
     :setForeground(colors.gray)
 
 local detectedLabel = main:addLabel()
-    :setText("(brak gracza w poblizu)")
+    :setText("(no player nearby)")
     :setPosition(2, 8)
     :setSize(W - 2, 1)
     :setForeground(colors.orange)
 
--- ── Ostatni bilet ────────────────────────────────────────────
+-- ── Last ticket ──────────────────────────────────────────────
 main:addLabel()
-    :setText("Ostatni bilet:")
+    :setText("Last ticket:")
     :setPosition(2, 10)
     :setForeground(colors.gray)
 
 local lastKeyLabel = main:addLabel()
-    :setText("—")
+    :setText("-")
     :setPosition(2, 11)
     :setSize(W - 2, 1)
     :setForeground(colors.cyan)
@@ -149,31 +149,31 @@ for i = 1, 3 do
         :setForeground(colors.lightGray)
 end
 
--- ── Licznik ──────────────────────────────────────────────────
+-- ── Counter ──────────────────────────────────────────────────
 local counterLabel = main:addLabel()
-    :setText("Sprzedano: 0")
+    :setText("Sold: 0")
     :setPosition(2, H)
     :setForeground(colors.gray)
 
--- ── Przycisk KUP ─────────────────────────────────────────────
+-- ── BUY button ───────────────────────────────────────────────
 local buyBtn = main:addButton()
-    :setText(" KUP BILET ")
+    :setText(" BUY TICKET ")
     :setPosition(2, H - 3)
     :setSize(16, 3)
     :setBackground(colors.green)
     :setForeground(colors.white)
 
--- ── Przycisk PRZERWIJ (domyślnie ukryty) ─────────────────────
+-- ── CANCEL button (hidden by default) ────────────────────────
 local cancelBtn = main:addButton()
-    :setText(" PRZERWIJ ")
+    :setText(" CANCEL ")
     :setPosition(W - 16, H - 3)
     :setSize(16, 3)
     :setBackground(colors.red)
     :setForeground(colors.white)
-cancelBtn:hide()
+cancelBtn:setVisible(false)
 
 -- ──────────────────────────────────────────────────────────────
---  POMOCNICZE FUNKCJE UI
+--  UI HELPER FUNCTIONS
 -- ──────────────────────────────────────────────────────────────
 local function addLog(msg)
     local t = os.date("*t")
@@ -199,15 +199,15 @@ local function setBuyBtnEnabled(enabled)
 end
 
 local function unlockDepositor()
-    relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, false)   -- relay OFF → depositor aktywny
+    relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, false)   -- relay OFF -> depositor active
 end
 
 local function lockDepositor()
-    relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)    -- relay ON → depositor zablokowany
+    relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)    -- relay ON -> depositor locked
 end
 
 -- ──────────────────────────────────────────────────────────────
---  ENTITY DETECTOR – wykryj najbliższego gracza
+--  ENTITY DETECTOR - detect nearest player
 -- ──────────────────────────────────────────────────────────────
 local function detectNearestPlayer()
     local ok, entities = pcall(function() return detector.getEntities() end)
@@ -219,7 +219,7 @@ local function detectNearestPlayer()
             local dist = math.sqrt((e.x or 0)^2 + (e.y or 0)^2 + (e.z or 0)^2)
             if dist < nearestDist then
                 nearestDist = dist
-                nearest = e.name or "Nieznany"
+                nearest = e.name or "Unknown"
             end
         end
     end
@@ -227,17 +227,17 @@ local function detectNearestPlayer()
 end
 
 -- ──────────────────────────────────────────────────────────────
---  LOGIKA DRUKOWANIA BILETU
+--  TICKET PRINTING LOGIC
 -- ──────────────────────────────────────────────────────────────
 local function printTicket(key, nick)
     if printer.getPaperLevel() < 1 then
-        return false, "Brak papieru w printerze!"
+        return false, "No paper in printer!"
     end
     if printer.getInkLevel() < 1 then
-        return false, "Brak tuszu w printerze!"
+        return false, "No ink in printer!"
     end
     if not printer.newPage() then
-        return false, "Nie mozna rozpoczac druku!"
+        return false, "Cannot start printing!"
     end
 
     local pw = printer.getPageSize()
@@ -245,27 +245,27 @@ local function printTicket(key, nick)
     printer.setPageTitle(config.TICKET_TITLE)
     printer.setCursorPos(1, 1); printer.write(config.BASE_NAME)
     printer.setCursorPos(1, 2); printer.write(string.rep("=", pw))
-    printer.setCursorPos(1, 3); printer.write("Gracz: " .. nick)
-    printer.setCursorPos(1, 4); printer.write("Klucz:")
+    printer.setCursorPos(1, 3); printer.write("Player: " .. nick)
+    printer.setCursorPos(1, 4); printer.write("Key:")
     printer.setCursorPos(1, 5); printer.write("  " .. key)
 
     local t = os.date("*t")
     local dateStr = string.format("%02d/%02d/%04d %02d:%02d",
         t.mday, t.month, t.year, t.hour, t.min)
-    printer.setCursorPos(1, 6); printer.write("Data: " .. dateStr)
+    printer.setCursorPos(1, 6); printer.write("Date: " .. dateStr)
     printer.setCursorPos(1, 7); printer.write(string.rep("-", pw))
-    printer.setCursorPos(1, 8); printer.write("Poloz na pedestalu")
-    printer.setCursorPos(1, 9); printer.write("przy wejsciu do bazy")
-    printer.setCursorPos(1, 11); printer.write("! BILET JEDNORAZOWY !")
+    printer.setCursorPos(1, 8); printer.write("Place on pedestal")
+    printer.setCursorPos(1, 9); printer.write("at the base entrance")
+    printer.setCursorPos(1, 11); printer.write("! SINGLE-USE TICKET !")
 
     if not printer.endPage() then
-        return false, "Nie mozna zakonczyc druku!"
+        return false, "Cannot finish printing!"
     end
     return true, nil
 end
 
 -- ──────────────────────────────────────────────────────────────
---  LOGIKA REJESTRACJI W KOMPUTERZE WEJŚCIA
+--  TICKET REGISTRATION AT ENTRY COMPUTER
 -- ──────────────────────────────────────────────────────────────
 local function registerTicketAtEntry(key, nick)
     local payload = { key = key, nick = nick, time = os.time() }
@@ -278,26 +278,26 @@ local function registerTicketAtEntry(key, nick)
 end
 
 -- ──────────────────────────────────────────────────────────────
---  GŁÓWNA LOGIKA ZAKUPU
+--  MAIN PURCHASE LOGIC
 -- ──────────────────────────────────────────────────────────────
 local function handlePurchase(nick)
     state.status = "waiting_payment"
     cancelRequested = false
     setBuyBtnEnabled(false)
-    cancelBtn:show()
+    cancelBtn:setVisible(true)
 
-    -- Odblokuj depositor: relay OFF → brak sygnału redstone → depositor aktywny
+    -- Unlock depositor: relay OFF -> no redstone signal -> depositor active
     unlockDepositor()
-    setStatus("Wloz " .. config.TICKET_PRICE_SPURS .. " spur do Depositora...", colors.yellow)
-    addLog("Oczekiwanie na platnosc: " .. nick)
+    setStatus("Insert " .. config.TICKET_PRICE_SPURS .. " spur into Depositor...", colors.yellow)
+    addLog("Waiting for payment: " .. nick)
 
-    -- Czekaj na puls redstone od Depositora (potwierdzenie płatności)
-    -- lub na anulowanie, lub na timeout
+    -- Wait for redstone pulse from Depositor (payment confirmation)
+    -- or cancellation, or timeout
     local paid = false
     local deadline = os.clock() + config.PAYMENT_TIMEOUT
 
     while os.clock() < deadline and not cancelRequested do
-        -- sygnał INVERTED: brak sygnału na wejściu relay_30 oznacza zapłatę
+        -- INVERTED signal: no signal on relay_30 input means payment received
         if not relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then
             paid = true
             break
@@ -305,82 +305,82 @@ local function handlePurchase(nick)
         os.sleep(0.05)
     end
 
-    -- Zablokuj depositor z powrotem niezależnie od wyniku
+    -- Lock depositor regardless of outcome
     lockDepositor()
-    cancelBtn:hide()
+    cancelBtn:setVisible(false)
 
     if cancelRequested then
         state.status = "idle"
         setBuyBtnEnabled(true)
-        setStatus("Zamowienie przerwane", colors.orange)
-        addLog("Zamowienie przerwane")
+        setStatus("Order cancelled", colors.orange)
+        addLog("Order cancelled")
         return
     end
 
     if not paid then
         state.status = "idle"
         setBuyBtnEnabled(true)
-        setStatus("Timeout platnosci – sprobuj ponownie", colors.red)
-        addLog("BLAD: brak platnosci w " .. config.PAYMENT_TIMEOUT .. "s")
+        setStatus("Payment timeout - try again", colors.red)
+        addLog("ERROR: no payment within " .. config.PAYMENT_TIMEOUT .. "s")
         return
     end
 
-    addLog("Platnosc potwierdzona!")
+    addLog("Payment confirmed!")
 
-    -- Drukuj bilet
+    -- Print ticket
     state.status = "printing"
-    setStatus("Drukowanie biletu...", colors.yellow)
+    setStatus("Printing ticket...", colors.yellow)
 
     local key = uuid.generate()
     local printOk, printErr = printTicket(key, nick)
     if not printOk then
         state.status = "idle"
         setBuyBtnEnabled(true)
-        setStatus("Blad druku: " .. printErr, colors.red)
-        addLog("BLAD druku: " .. printErr)
+        setStatus("Print error: " .. printErr, colors.red)
+        addLog("ERROR printing: " .. printErr)
         return
     end
 
-    addLog("Wydrukowano bilet dla: " .. nick)
+    addLog("Printed ticket for: " .. nick)
 
-    -- Wyślij do komputera wejścia
+    -- Send to entry computer
     state.status = "sending"
-    setStatus("Rejestracja biletu...", colors.yellow)
+    setStatus("Registering ticket...", colors.yellow)
 
     local regOk = registerTicketAtEntry(key, nick)
     if not regOk then
         state.status = "idle"
         setBuyBtnEnabled(true)
-        setStatus("BLAD: brak polaczenia z wejsciem!", colors.red)
-        addLog("BLAD: wejscie nie odpowiedzialo")
-        addLog("Bilet wydrukowany ale NIE zarejestrowany!")
+        setStatus("ERROR: no connection to entry!", colors.red)
+        addLog("ERROR: entry did not respond")
+        addLog("Ticket printed but NOT registered!")
         return
     end
 
-    -- Sukces
+    -- Success
     state.soldCount     = state.soldCount + 1
     state.lastTicketKey = key
     state.lastNick      = nick
     state.status        = "idle"
 
     lastKeyLabel:setText(key)
-    lastNickLabel:setText("Gracz: " .. nick)
-    counterLabel:setText("Sprzedano: " .. state.soldCount)
+    lastNickLabel:setText("Player: " .. nick)
+    counterLabel:setText("Sold: " .. state.soldCount)
     setBuyBtnEnabled(true)
-    setStatus("Bilet sprzedany! Odbierz z printera.", colors.lime)
-    addLog("OK: " .. key .. " dla " .. nick)
+    setStatus("Ticket sold! Collect from printer.", colors.lime)
+    addLog("OK: " .. key .. " for " .. nick)
 end
 
 -- ──────────────────────────────────────────────────────────────
---  PODPIĘCIE PRZYCISKÓW
+--  BUTTON CALLBACKS
 -- ──────────────────────────────────────────────────────────────
 buyBtn:onClick(function()
     if state.status ~= "idle" then return end
 
     local nick = state.detectedNick
     if not nick then
-        setStatus("Brak gracza w poblizu!", colors.red)
-        addLog("Blad: nie wykryto gracza")
+        setStatus("No player nearby!", colors.red)
+        addLog("Error: no player detected")
         return
     end
 
@@ -392,7 +392,7 @@ cancelBtn:onClick(function()
 end)
 
 -- ──────────────────────────────────────────────────────────────
---  PETLA WYKRYWANIA GRACZA (tło)
+--  PLAYER DETECTION LOOP (background)
 -- ──────────────────────────────────────────────────────────────
 basalt.schedule(function()
     while true do
@@ -402,7 +402,7 @@ basalt.schedule(function()
             detectedLabel:setText(nick)
             detectedLabel:setForeground(colors.lime)
         else
-            detectedLabel:setText("(brak gracza w poblizu)")
+            detectedLabel:setText("(no player nearby)")
             detectedLabel:setForeground(colors.orange)
         end
         os.sleep(1)
@@ -412,8 +412,8 @@ end)
 -- ──────────────────────────────────────────────────────────────
 --  START
 -- ──────────────────────────────────────────────────────────────
-setStatus("Gotowy do sprzedazy", colors.lime)
-addLog("System kasy uruchomiony")
-addLog("Cena: " .. config.TICKET_PRICE_SPURS .. " spur")
+setStatus("Ready for sale", colors.lime)
+addLog("Cashier system started")
+addLog("Price: " .. config.TICKET_PRICE_SPURS .. " spur")
 
 basalt.run()
