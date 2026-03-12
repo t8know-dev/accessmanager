@@ -387,10 +387,10 @@ end)
 -- Scrolling info text animation (row 3)
 basalt.schedule(function()
     local msg = "Access to the villager trading hall included!"
-    local padded = msg .. string.rep(" ", 4)
+    local padded = msg .. string.rep(" ", W)
     local len = #padded
     local doubled = padded .. padded
-    local offset = 0
+    local offset = len - W  -- start with blank screen, message slides in from right
     while true do
         local view = doubled:sub(offset + 1, offset + W)
         scrollLabel:setText(view)
@@ -404,10 +404,10 @@ basalt.schedule(function()
     local frames = {
         { bg = colors.blue,      fg = colors.white,  tx = "  * TICKETS *  " },
         { bg = colors.cyan,      fg = colors.yellow,  tx = "  ** TICKETS **  " },
-        { bg = colors.lightBlue, fg = colors.white,  tx = "  *** TICKETS ***  " },
         { bg = colors.blue,      fg = colors.yellow, tx = "  >   TICKETS   <  " },
-        { bg = colors.purple,    fg = colors.white,  tx = "  >>  TICKETS  <<  " },
         { bg = colors.blue,      fg = colors.cyan,   tx = "  >>> TICKETS <<<  " },
+        { bg = colors.purple,    fg = colors.white,  tx = "  >>  TICKETS  <<  " },
+        { bg = colors.lightBlue, fg = colors.white,  tx = "  *** TICKETS ***  " },
     }
     local i = 1
     while true do
