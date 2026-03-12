@@ -17,6 +17,9 @@ local depositor = peripheral.wrap(config.DEPOSITOR_NAME)
 local printer = peripheral.wrap(config.PRINTER_SIDE)
     or error("Printer not found on side: " .. config.PRINTER_SIDE, 0)
 
+local cashierPedestal = peripheral.wrap(config.CASHIER_PEDESTAL_NAME)
+    or error("Cashier pedestal not found: " .. config.CASHIER_PEDESTAL_NAME, 0)
+
 local relayLock = peripheral.wrap(config.RELAY_DEPOSIT_LOCK_NAME)
     or error("Relay (lock) not found: " .. config.RELAY_DEPOSIT_LOCK_NAME, 0)
 
@@ -338,6 +341,16 @@ local function handlePurchase(nick)
 
     addLog("Printed ticket for: " .. nick)
 
+    -- Move printed ticket (printer output slot 3) to cashier pedestal
+    local moved = printer.pushItems(config.CASHIER_PEDESTAL_NAME, 3, 1)
+    if moved and moved > 0 then
+        addLog("Ticket placed on pedestal")
+        dbg("Ticket moved to pedestal: " .. tostring(moved) .. " item(s)")
+    else
+        addLog("WARN: could not move ticket to pedestal")
+        dbg("WARN: pushItems to pedestal returned: " .. tostring(moved))
+    end
+
     state.status = "sending"
     setStatus("Registering ticket...", colors.yellow)
 
@@ -360,7 +373,7 @@ local function handlePurchase(nick)
     lastNickLabel:setText("Player: " .. nick)
     counterLabel:setText("Sold: " .. state.soldCount)
     setBuyBtnEnabled(true)
-    setStatus("Ticket sold! Collect from printer.", colors.lime)
+    setStatus("Ticket sold! Collect from pedestal.", colors.lime)
     addLog("OK: " .. key .. " for " .. nick)
 end
 
