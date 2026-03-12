@@ -193,6 +193,18 @@ local function scanPedestal()
 end
 
 print("[ENTRY] System started")
+
+dbg("=== CASHIER STARTUP DIAGNOSTICS ===")
+dbg("Computer ID: " .. os.getComputerID())
+dbg("Entry ID in config: " .. config.ENTRY_COMPUTER_ID)
+dbg("Peripherals: " .. table.concat(peripheral.getNames(), ", "))
+for _, name in ipairs(peripheral.getNames()) do
+    if peripheral.getType(name) == "modem" then
+        dbg("Modem '" .. name .. "' isOpen=" .. tostring(rednet.isOpen(name)))
+    end
+end
+dbg("===================================")
+
 print("[ENTRY] Tickets in database: " .. db.count())
 
 monDraw("Waiting...", "Place ticket on pedestal")
