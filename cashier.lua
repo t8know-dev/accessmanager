@@ -96,7 +96,14 @@ main:addLabel()
     :setBackground(colors.blue)
     :setForeground(colors.yellow)
 
--- (rows 3–4: gap)
+-- Scrolling info text (row 3)
+local scrollLabel = main:addLabel()
+    :setPosition(1, 3)
+    :setSize(W, 1)
+    :setBackground(colors.black)
+    :setForeground(colors.lightBlue)
+
+-- (row 4: gap)
 
 -- Price (row 5)
 main:addLabel()
@@ -374,6 +381,20 @@ basalt.schedule(function()
             detectedLabel:setForeground(colors.orange)
         end
         os.sleep(1)
+    end
+end)
+
+-- Scrolling info text animation (row 3)
+basalt.schedule(function()
+    local msg = "Access to the villager trading hall included!"
+    local padded = msg .. string.rep(" ", W)
+    local offset = 0
+    while true do
+        local view = padded:sub(offset + 1, offset + W)
+        if #view < W then view = view .. string.rep(" ", W - #view) end
+        scrollLabel:setText(view)
+        offset = (offset + 1) % #padded
+        os.sleep(0.15)
     end
 end)
 
