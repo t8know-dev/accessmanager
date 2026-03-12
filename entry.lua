@@ -39,9 +39,9 @@ do
 end
 db.load()
 
--- state: "idle" | "ok" | "reject"
 local function monDraw(state)
     if not monitor then return end
+    monitor.setTextScale(0.5)
     local w, h = monitor.getSize()
 
     local bg, fg
@@ -55,24 +55,55 @@ local function monDraw(state)
 
     local old = term.redirect(monitor)
     paintutils.drawFilledBox(1, 1, w, h, bg)
+    term.redirect(old)
+
+    monitor.setBackgroundColor(bg)
+    monitor.setTextColor(fg)
 
     if state == "ok" then
-        -- Checkmark: short down-right stroke then long up-right stroke
+
+        local symbol = "\x16" 
+
         local cx = math.floor(w / 2)
-        paintutils.drawLine(math.max(1, cx - 2), math.floor(h / 2), cx, h - 1, fg)
-        paintutils.drawLine(cx, h - 1, w - 1, 1, fg)
+        local cy = math.floor(h / 2)
+
+        -- monitor.setCursorPos(cx, cy)
+        -- monitor.write("\4")
+
+        for i = 0, math.min(w, h) - 2 do
+            local lx = math.max(1, cx - 2) + i
+            local ly = cy + i - 1
+            if lx >= 1 and lx <= w and ly >= 1 and ly <= h then
+                monitor.setBackgroundColor(fg)
+                monitor.setTextColor(bg)
+                monitor.setCursorPos(lx, ly)
+                monitor.write(" ")
+                monitor.setBackgroundColor(bg)
+            end
+        end
+
     elseif state == "reject" then
-        -- X: two diagonals crossing in the center
-        paintutils.drawLine(2, 2, w - 1, h - 1, fg)
-        paintutils.drawLine(w - 1, 2, 2, h - 1, fg)
+        local steps = math.min(w, h) - 2
+        for i = 0, steps do
+            local x1 = 2 + math.floor(i * (w - 3) / steps)
+            local y1 = 2 + math.floor(i * (h - 3) / steps)
+            local x2 = (w - 1) - math.floor(i * (w - 3) / steps)
+            local y2 = 2 + math.floor(i * (h - 3) / steps)
+
+            monitor.setBackgroundColor(fg)
+            monitor.setCursorPos(x1, y1)
+            monitor.write(" ")
+
+            monitor.setCursorPos(x2, y2)
+            monitor.write(" ")
+
+            monitor.setBackgroundColor(bg)
+        end
+
     else
-        -- Idle: centered dash
-        monitor.setTextColor(fg)
-        monitor.setCursorPos(math.floor(w / 2) + 1, math.floor(h / 2) + 1)
+        monitor.setCursorPos(math.floor(w / 2), math.floor(h / 2))
         monitor.write("-")
     end
-
-    term.redirect(old)
 end
 
 local function openDoor()
