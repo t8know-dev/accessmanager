@@ -21,7 +21,7 @@ local relayDoor = peripheral.wrap(config.RELAY_DOOR_NAME)
 
 local monitor = peripheral.find("monitor")
 if monitor then
-    monitor.setTextScale(1)
+    monitor.setTextScale(2)
 end
 
 do
@@ -39,32 +39,23 @@ do
 end
 db.load()
 
-local function monDraw(line1, line2, col)
+-- state: "idle" | "ok" | "reject"
+local function monDraw(state)
     if not monitor then return end
-    monitor.setBackgroundColor(colors.black)
+    local w, h = monitor.getSize()
+    local bg, fg, sym
+    if state == "ok" then
+        bg, fg, sym = colors.green, colors.black, string.char(251) -- √ / checkmark
+    elseif state == "reject" then
+        bg, fg, sym = colors.red, colors.black, "X"
+    else
+        bg, fg, sym = colors.black, colors.gray, "-"
+    end
+    monitor.setBackgroundColor(bg)
     monitor.clear()
-    local mw, mh = monitor.getSize()
-
-    local function mCenter(y, text, fg, bg)
-        monitor.setBackgroundColor(bg or colors.black)
-        monitor.setTextColor(fg or colors.white)
-        monitor.setCursorPos(math.max(1, math.floor((mw - #text) / 2) + 1), y)
-        monitor.write(text)
-    end
-
-    monitor.setBackgroundColor(colors.blue)
-    for y = 1, 2 do
-        monitor.setCursorPos(1, y)
-        monitor.write(string.rep(" ", mw))
-    end
-    mCenter(1, config.BASE_NAME, colors.white, colors.blue)
-    mCenter(2, "ENTRY", colors.yellow, colors.blue)
-
-    monitor.setBackgroundColor(colors.black)
-    mCenter(math.floor(mh / 2),     line1 or "", col or colors.white)
-    mCenter(math.floor(mh / 2) + 1, line2 or "", colors.lightGray)
-    mCenter(mh - 1, "Place ticket on pedestal", colors.gray)
-    mCenter(mh,     "to open the entry",        colors.gray)
+    monitor.setTextColor(fg)
+    monitor.setCursorPos(math.floor((w - #sym) / 2) + 1, math.floor(h / 2) + 1)
+    monitor.write(sym)
 end
 
 local function openDoor()
