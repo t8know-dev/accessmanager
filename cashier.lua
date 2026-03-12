@@ -29,11 +29,18 @@ if not detector then
 end
 
 do
+    local native = term.native()
+    local function nprint(msg)
+        local prev = term.redirect(native)
+        print(msg)
+        term.redirect(prev)
+    end
     local opened = false
+    nprint("[CASHIER] Peripherals: " .. table.concat(peripheral.getNames(), ", "))
     for _, name in ipairs(peripheral.getNames()) do
         if peripheral.getType(name) == "modem" then
             rednet.open(name)
-            print("[CASHIER] Opened modem: " .. name .. " (isOpen=" .. tostring(rednet.isOpen(name)) .. ")")
+            nprint("[CASHIER] Opened modem: " .. name .. " isOpen=" .. tostring(rednet.isOpen(name)))
             opened = true
         end
     end
