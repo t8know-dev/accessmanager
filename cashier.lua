@@ -84,7 +84,7 @@ end
 local headerLabel = main:addLabel()
     :setText("\n" .. padCenter("*** TICKETS ***", W))
     :setPosition(1, 1)
-    :setSize(W, 3)
+    :setSize(W, 1)
     :setBackground(colors.blue)
     :setForeground(colors.white)
 
@@ -92,7 +92,7 @@ local headerLabel = main:addLabel()
 main:addLabel()
     :setText(padCenter(config.BASE_NAME, W))
     :setPosition(1, 4)
-    :setSize(W, 1)
+    :setSize(W, 2)
     :setBackground(colors.blue)
     :setForeground(colors.yellow)
 
