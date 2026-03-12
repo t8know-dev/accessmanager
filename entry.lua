@@ -44,59 +44,23 @@ local function monDraw(state)
     if not monitor then return end
     local w, h = monitor.getSize()
 
-    local bg, fg
+    local bg, symbol
     if state == "ok" then
-        bg, fg = colors.green, colors.black
+        bg, symbol = colors.green, "\xfb"  -- znak √
     elseif state == "reject" then
-        bg, fg = colors.red, colors.black
+        bg, symbol = colors.red, "x"
     else
-        bg, fg = colors.black, colors.gray
+        bg, symbol = colors.black, "-"
     end
-
 
     local old = term.redirect(monitor)
     paintutils.drawFilledBox(1, 1, w, h, bg)
     term.redirect(old)
 
-
-    local function drawLine(x1, y1, x2, y2)
-        local dx = math.abs(x2 - x1)
-        local dy = math.abs(y2 - y1)
-        local sx = x1 < x2 and 1 or -1
-        local sy = y1 < y2 and 1 or -1
-        local err = dx - dy
-        local x, y = x1, y1
-        while true do
-            if x >= 1 and x <= w and y >= 1 and y <= h then
-                monitor.setCursorPos(x, y)
-                monitor.write(" ")
-            end
-            if x == x2 and y == y2 then break end
-            local e2 = 2 * err
-            if e2 > -dy then err = err - dy; x = x + sx end
-            if e2 < dx then err = err + dx; y = y + sy end
-        end
-    end
-
-    monitor.setBackgroundColor(fg) 
-
-    if state == "ok" then
-        
-        local mid_x = math.max(2, math.floor(w / 3))
-        local left_start_y = h - math.floor(h / 3)
-        drawLine(1, left_start_y, mid_x, h)   
-        drawLine(mid_x, h, w, 1)               
-
-    elseif state == "reject" then
-        drawLine(1, 1, w, h)
-        drawLine(w, 1, 1, h)
-
-    else
-        monitor.setCursorPos(math.floor(w / 2), math.floor(h / 2))
-        monitor.write(" ")
-    end
-
     monitor.setBackgroundColor(bg)
+    monitor.setTextColor(colors.black)
+    monitor.setCursorPos(math.floor(w / 2) + 1, math.floor(h / 2) + 1)
+    monitor.write(symbol)
 end
 
 local function openDoor()
