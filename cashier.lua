@@ -401,4 +401,15 @@ setStatus("Ready for sale", colors.lime)
 addLog("Cashier system started")
 addLog("Price: " .. config.TICKET_PRICE_SPURS .. " spur")
 
+dbg("=== CASHIER STARTUP DIAGNOSTICS ===")
+dbg("Computer ID: " .. os.getComputerID())
+dbg("Entry ID in config: " .. config.ENTRY_COMPUTER_ID)
+dbg("Peripherals: " .. table.concat(peripheral.getNames(), ", "))
+for _, name in ipairs(peripheral.getNames()) do
+    if peripheral.getType(name) == "modem" then
+        dbg("Modem '" .. name .. "' isOpen=" .. tostring(rednet.isOpen(name)))
+    end
+end
+dbg("===================================")
+
 basalt.run()
