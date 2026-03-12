@@ -43,19 +43,36 @@ db.load()
 local function monDraw(state)
     if not monitor then return end
     local w, h = monitor.getSize()
-    local bg, fg, sym
+
+    local bg, fg
     if state == "ok" then
-        bg, fg, sym = colors.green, colors.black, string.char(251) -- √ / checkmark
+        bg, fg = colors.green, colors.black
     elseif state == "reject" then
-        bg, fg, sym = colors.red, colors.black, "X"
+        bg, fg = colors.red, colors.black
     else
-        bg, fg, sym = colors.black, colors.gray, "-"
+        bg, fg = colors.black, colors.gray
     end
-    monitor.setBackgroundColor(bg)
-    monitor.clear()
-    monitor.setTextColor(fg)
-    monitor.setCursorPos(math.floor((w - #sym) / 2) + 1, math.floor(h / 2) + 1)
-    monitor.write(sym)
+
+    local old = term.redirect(monitor)
+    paintutils.drawFilledBox(1, 1, w, h, bg)
+
+    if state == "ok" then
+        -- Checkmark: short down-right stroke then long up-right stroke
+        local cx = math.floor(w / 2)
+        paintutils.drawLine(math.max(1, cx - 2), math.floor(h / 2), cx, h - 1, fg)
+        paintutils.drawLine(cx, h - 1, w - 1, 1, fg)
+    elseif state == "reject" then
+        -- X: two diagonals crossing in the center
+        paintutils.drawLine(2, 2, w - 1, h - 1, fg)
+        paintutils.drawLine(w - 1, 2, 2, h - 1, fg)
+    else
+        -- Idle: centered dash
+        monitor.setTextColor(fg)
+        monitor.setCursorPos(math.floor(w / 2) + 1, math.floor(h / 2) + 1)
+        monitor.write("-")
+    end
+
+    term.redirect(old)
 end
 
 local function openDoor()
