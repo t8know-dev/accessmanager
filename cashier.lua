@@ -255,26 +255,16 @@ local function handlePurchase(nick)
     setStatus("Insert " .. config.TICKET_PRICE_SPURS .. " spur into Depositor...", colors.yellow, colors.gray)
     writeLog("Waiting for payment: " .. nick)
 
-    -- Wait for depositor to activate: relay must go HIGH before we start watching for LOW (paid)
-    local activateDeadline = os.clock() + 3
-    while os.clock() < activateDeadline do
-        if relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then break end
-        os.sleep(0.05)
-    end
-    if relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then
-        lockDepositor()
-        cancelBtn:setVisible(false)
-        state.status = "idle"
-        setBuyBtnEnabled(true)
-        setStatus("Depositor not ready!", colors.white, colors.red)
-        writeLog("ERROR: depositor did not activate for: " .. nick)
-        return
-    end
+    -- Let signal stabilize after unlock, then snapshot baseline state
+    os.sleep(0.3)
+    local baseline = relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE)
+    writeLog("Relay baseline: " .. tostring(baseline))
 
+    -- Payment detected as ANY transition away from baseline (inverted LOW pulse on payment)
     local paid = false
     local deadline = os.clock() + config.PAYMENT_TIMEOUT
     while os.clock() < deadline and not cancelRequested do
-        if not relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then
+        if relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) ~= baseline then
             paid = true; break
         end
         os.sleep(0.05)
