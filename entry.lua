@@ -24,14 +24,6 @@ if monitor then
     monitor.setTextScale(1)
 end
 
-local function dbg(msg)
-    local t = os.date("*t")
-    local line = string.format("[%02d:%02d:%02d] %s", t.hour, t.min, t.sec, msg)
-    local prev = term.redirect(term.native())
-    print(line)
-    term.redirect(prev)
-end
-
 do
     local opened = false
     for _, name in ipairs(peripheral.getNames()) do
@@ -201,18 +193,14 @@ local function scanPedestal()
 end
 
 print("[ENTRY] System started")
-
-dbg("=== CASHIER STARTUP DIAGNOSTICS ===")
-dbg("Computer ID: " .. os.getComputerID())
-dbg("Entry ID in config: " .. config.ENTRY_COMPUTER_ID)
-dbg("Peripherals: " .. table.concat(peripheral.getNames(), ", "))
+print("[ENTRY] Computer ID: " .. os.getComputerID())
+print("[ENTRY] Cashier ID in config: " .. config.KASA_COMPUTER_ID)
+print("[ENTRY] Peripherals: " .. table.concat(peripheral.getNames(), ", "))
 for _, name in ipairs(peripheral.getNames()) do
     if peripheral.getType(name) == "modem" then
-        dbg("Modem '" .. name .. "' isOpen=" .. tostring(rednet.isOpen(name)))
+        print("[ENTRY] Modem '" .. name .. "' isOpen=" .. tostring(rednet.isOpen(name)))
     end
 end
-dbg("===================================")
-
 print("[ENTRY] Tickets in database: " .. db.count())
 
 monDraw("Waiting...", "Place ticket on pedestal")
