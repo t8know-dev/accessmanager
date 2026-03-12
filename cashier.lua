@@ -261,7 +261,7 @@ local function handlePurchase(nick)
         if relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then break end
         os.sleep(0.05)
     end
-    if not relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then
+    if relayPulse.getInput(config.RELAY_DEPOSIT_OUT_SIDE) then
         lockDepositor()
         cancelBtn:setVisible(false)
         state.status = "idle"
@@ -369,11 +369,11 @@ end)
 -- Animated header: cycle frames to force Basalt re-render (setText triggers render)
 basalt.schedule(function()
     local frames = {
-        { bg = colors.blue,      fg = colors.white,  tx = "  *** TICKETS ***  " },
-        { bg = colors.cyan,      fg = colors.black,  tx = "  >>> TICKETS <<<  " },
+        { bg = colors.blue,      fg = colors.white,  tx = "  * TICKETS *  " },
+        { bg = colors.cyan,      fg = colors.yellow,  tx = "  ** TICKETS **  " },
         { bg = colors.lightBlue, fg = colors.white,  tx = "  *** TICKETS ***  " },
-        { bg = colors.blue,      fg = colors.yellow, tx = "  *   TICKETS   *  " },
-        { bg = colors.purple,    fg = colors.white,  tx = "  *** TICKETS ***  " },
+        { bg = colors.blue,      fg = colors.yellow, tx = "  >   TICKETS   <  " },
+        { bg = colors.purple,    fg = colors.white,  tx = "  >>  TICKETS  <<  " },
         { bg = colors.blue,      fg = colors.cyan,   tx = "  >>> TICKETS <<<  " },
     }
     local i = 1
