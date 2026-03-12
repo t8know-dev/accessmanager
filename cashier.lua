@@ -199,7 +199,7 @@ local function printTicket(key, nick)
 
     local t = os.date("*t")
     local dateStr = string.format("%02d/%02d/%04d %02d:%02d",
-        t.mday, t.month, t.year, t.hour, t.min)
+        t.day, t.month, t.year, t.hour, t.min)
     printer.setCursorPos(1, 6); printer.write("Date: " .. dateStr)
     printer.setCursorPos(1, 7); printer.write(string.rep("-", pw))
     printer.setCursorPos(1, 8); printer.write("Place on pedestal")

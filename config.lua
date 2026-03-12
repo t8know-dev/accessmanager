@@ -9,7 +9,7 @@ config.PROTOCOL_REGISTER = "ticket_register"
 config.PROTOCOL_ACK      = "ticket_ack"
 
 config.KASA_MODEM_SIDE    = "right"
-config.WEJSCIE_MODEM_SIDE = "right"
+config.WEJSCIE_MODEM_SIDE = "left"
 
 config.PRINTER_SIDE = "left"
 
