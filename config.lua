@@ -26,7 +26,7 @@ config.RELAY_DEPOSIT_LOCK_SIDE = "top"
 -- Entry network peripherals (wired to modem of computer_388)
 config.PEDESTAL_NAME    = "item_pedestal_5"
 config.ENTRY_MONITOR_NAME = "monitor_930"
-config.RELAY_DOOR_NAME  = "redstone_relay_29"
+config.RELAY_DOOR_NAME  = "redstone_relay_34"
 config.RELAY_DOOR_SIDE1 = "left"
 config.RELAY_DOOR_SIDE2 = "right"
 
