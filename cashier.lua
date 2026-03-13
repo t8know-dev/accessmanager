@@ -21,9 +21,18 @@ local relayPulse = peripheral.wrap(config.RELAY_DEPOSIT_OUT_NAME)
     or error("Relay (pulse) not found: " .. config.RELAY_DEPOSIT_OUT_NAME, 0)
 
 -- Entity Detector is looked up fresh each call to survive chunk unload/reload.
--- We validate it exists at startup, but do not cache the reference permanently.
-if not peripheral.find("entity_detector") then
-    error("Entity Detector not found! Check connections.", 0)
+-- Retry at startup to handle chunk-load timing delays.
+do
+    local found = false
+    for _ = 1, 10 do
+        if peripheral.wrap(config.ENTITY_DETECTOR_NAME) or peripheral.find("entity_detector") then
+            found = true; break
+        end
+        os.sleep(0.5)
+    end
+    if not found then
+        error("Entity Detector not found! Check connections.", 0)
+    end
 end
 
 do
@@ -178,7 +187,7 @@ local function lockDepositor()
 end
 
 local function detectNearestPlayer()
-    local det = peripheral.find("entity_detector")
+    local det = peripheral.wrap(config.ENTITY_DETECTOR_NAME) or peripheral.find("entity_detector")
     if not det then return nil end
     local ok, entities = pcall(function() return det.nearbyEntities() end)
     if not ok or type(entities) ~= "table" then return nil end
@@ -380,17 +389,25 @@ cancelBtn:onClick(function()
 end)
 
 --  Background tasks 
--- Update detected player every second
+-- Update detected player every second; restart loop on error to survive peripheral glitches
 basalt.schedule(function()
     while true do
-        local nick = detectNearestPlayer()
-        state.detectedNick = nick
-        if nick then
-            detectedLabel:setText(nick)
-            detectedLabel:setForeground(colors.lime)
-        else
-            detectedLabel:setText("(no player nearby)")
-            detectedLabel:setForeground(colors.orange)
+        local ok, err = pcall(function()
+            while true do
+                local nick = detectNearestPlayer()
+                state.detectedNick = nick
+                if nick then
+                    detectedLabel:setText(nick)
+                    detectedLabel:setForeground(colors.lime)
+                else
+                    detectedLabel:setText("(no player nearby)")
+                    detectedLabel:setForeground(colors.orange)
+                end
+                os.sleep(1)
+            end
+        end)
+        if not ok then
+            writeLog("WARN: player detector loop crashed: " .. tostring(err) .. " - restarting")
         end
         os.sleep(1)
     end
