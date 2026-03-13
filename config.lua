@@ -30,7 +30,8 @@ config.RELAY_DOOR_SIDE1 = "top"
 config.RELAY_DOOR_SIDE2 = "bottom"
 
 -- Dump chest: set DUMP_CHEST_NAME for network, or DUMP_CHEST_SIDE for direct connection
-config.DUMP_CHEST_NAME = 'minecraft:chest_38'
+config.ENTITY_DETECTOR_NAME = "entity_detector_10"
+config.DUMP_CHEST_NAME = 'minecraft:chest_39'
 config.DUMP_CHEST_SIDE = nil
 
 config.TICKET_PRICE_SPURS = 2
