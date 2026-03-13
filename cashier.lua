@@ -3,7 +3,7 @@
 local config = require("config")
 local uuid   = require("uuid")
 
-local kasaMonitor = peripheral.find("monitor")
+local kasaMonitor = peripheral.wrap(config.MONITOR_NAME)
 if kasaMonitor then
     kasaMonitor.setTextScale(0.5)
     term.redirect(kasaMonitor)

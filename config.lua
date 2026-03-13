@@ -17,7 +17,7 @@ config.PRINTER_NAME = "printer_6"
 
 -- Cashier network peripherals (wired to modem on right side of computer_391)
 config.DEPOSITOR_NAME          = "Numismatics_Depositor_7"
-config.MONITOR_NAME            = "monitor_932"
+config.MONITOR_NAME            = "monitor_933"
 config.RELAY_DEPOSIT_OUT_NAME  = "redstone_relay_32"
 config.RELAY_DEPOSIT_OUT_SIDE  = "top"    -- INVERTED: no signal = paid
 config.RELAY_DEPOSIT_LOCK_NAME = "redstone_relay_33"
@@ -27,8 +27,8 @@ config.RELAY_DEPOSIT_LOCK_SIDE = "top"
 config.PEDESTAL_NAME    = "item_pedestal_5"
 config.ENTRY_MONITOR_NAME = "monitor_930"
 config.RELAY_DOOR_NAME  = "redstone_relay_29"
-config.RELAY_DOOR_SIDE1 = "top"
-config.RELAY_DOOR_SIDE2 = "bottom"
+config.RELAY_DOOR_SIDE1 = "left"
+config.RELAY_DOOR_SIDE2 = "right"
 
 -- Dump chest: set DUMP_CHEST_NAME for network, or DUMP_CHEST_SIDE for direct connection
 config.ENTITY_DETECTOR_NAME = "entity_detector_10"

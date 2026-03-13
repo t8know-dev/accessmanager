@@ -89,8 +89,8 @@ local function extractKeyFromNBT(rawNBT)
 end
 
 local function destroyTicket()
-    local pedestalName = peripheral.getName(pedestal)
-    local moved = dumpChest.pullItems(pedestalName, 1)
+    local dumpName = peripheral.getName(dumpChest)
+    local moved = pedestal.pushItems(dumpName, 1)
     return moved > 0
 end
 
@@ -134,7 +134,10 @@ local function verifyAndProcess()
     -- Single-use: mark as used before opening door
     db.markUsed(key)
     db.save()
-    destroyTicket()
+    local ok, err = pcall(destroyTicket)
+    if not ok then
+        print("[ENTRY] Warning: could not move ticket to dump chest: " .. tostring(err))
+    end
 
     monDraw("ok")
     openDoor()
