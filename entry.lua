@@ -89,8 +89,8 @@ local function extractKeyFromNBT(rawNBT)
 end
 
 local function destroyTicket()
-    local dumpName = peripheral.getName(dumpChest)
-    local moved = pedestal.pushItems(dumpName, 1)
+    local pedestalName = peripheral.getName(pedestal)
+    local moved = dumpChest.pullItems(pedestalName, 1)
     return moved > 0
 end
 
