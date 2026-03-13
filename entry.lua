@@ -20,7 +20,7 @@ end
 local relayDoor = peripheral.wrap(config.RELAY_DOOR_NAME)
     or error("Relay (door) not found: " .. config.RELAY_DOOR_NAME, 0)
 
-local monitor = peripheral.find("monitor")
+local monitor = peripheral.wrap(config.ENTRY_MONITOR_NAME)
 if monitor then
     monitor.setTextScale(2)
 end
