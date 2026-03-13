@@ -13,15 +13,16 @@ local basalt = require("basalt")
 
 local depositor = peripheral.wrap(config.DEPOSITOR_NAME)
     or error("Depositor not found: " .. config.DEPOSITOR_NAME, 0)
-local printer = peripheral.wrap(config.PRINTER_SIDE)
-    or error("Printer not found on side: " .. config.PRINTER_SIDE, 0)
+local printer = peripheral.wrap(config.PRINTER_NAME)
+    or error("Printer not found: " .. config.PRINTER_NAME, 0)
 local relayLock = peripheral.wrap(config.RELAY_DEPOSIT_LOCK_NAME)
     or error("Relay (lock) not found: " .. config.RELAY_DEPOSIT_LOCK_NAME, 0)
 local relayPulse = peripheral.wrap(config.RELAY_DEPOSIT_OUT_NAME)
     or error("Relay (pulse) not found: " .. config.RELAY_DEPOSIT_OUT_NAME, 0)
 
-local detector = peripheral.find("entity_detector")
-if not detector then
+-- Entity Detector is looked up fresh each call to survive chunk unload/reload.
+-- We validate it exists at startup, but do not cache the reference permanently.
+if not peripheral.find("entity_detector") then
     error("Entity Detector not found! Check connections.", 0)
 end
 
@@ -40,7 +41,7 @@ do
 end
 
 depositor.setTotalPrice(config.TICKET_PRICE_SPURS)
-relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)
+relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, false)
 
 --  Logging 
 local LOG_FILE = "/cashier_log.txt"
@@ -169,15 +170,17 @@ local function setBuyBtnEnabled(enabled)
 end
 
 local function unlockDepositor()
-    relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, false)
-end
-
-local function lockDepositor()
     relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, true)
 end
 
+local function lockDepositor()
+    relayLock.setOutput(config.RELAY_DEPOSIT_LOCK_SIDE, false)
+end
+
 local function detectNearestPlayer()
-    local ok, entities = pcall(function() return detector.nearbyEntities() end)
+    local det = peripheral.find("entity_detector")
+    if not det then return nil end
+    local ok, entities = pcall(function() return det.nearbyEntities() end)
     if not ok or type(entities) ~= "table" then return nil end
     local nearest, nearestDist = nil, math.huge
     for _, e in ipairs(entities) do
@@ -354,7 +357,16 @@ end
 --  Button handlers 
 buyBtn:onClick(function()
     if state.status ~= "idle" then return end
-    local nick = state.detectedNick
+    -- Refresh detector on click to recover from chunk unload/reload
+    local nick = detectNearestPlayer()
+    state.detectedNick = nick
+    if nick then
+        detectedLabel:setText(nick)
+        detectedLabel:setForeground(colors.lime)
+    else
+        detectedLabel:setText("(no player nearby)")
+        detectedLabel:setForeground(colors.orange)
+    end
     if not nick then
         setStatus("No player nearby!", colors.white, colors.red)
         writeLog("Purchase attempt: no player detected")

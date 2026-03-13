@@ -13,14 +13,15 @@ config.PROTOCOL_PONG     = "ticket_pong"
 config.KASA_MODEM_SIDE    = "right"
 config.WEJSCIE_MODEM_SIDE = "left"
 
-config.PRINTER_SIDE = "left"
+config.PRINTER_NAME = "printer_6"
 
 -- Cashier network peripherals (wired to modem on right side of computer_391)
-config.DEPOSITOR_NAME          = "Numismatics_Depositor_6"
-config.RELAY_DEPOSIT_OUT_NAME  = "redstone_relay_30"
+config.DEPOSITOR_NAME          = "Numismatics_Depositor_7"
+config.MONITOR_NAME            = "monitor_932"
+config.RELAY_DEPOSIT_OUT_NAME  = "redstone_relay_32"
 config.RELAY_DEPOSIT_OUT_SIDE  = "top"    -- INVERTED: no signal = paid
-config.RELAY_DEPOSIT_LOCK_NAME = "redstone_relay_31"
-config.RELAY_DEPOSIT_LOCK_SIDE = "left"
+config.RELAY_DEPOSIT_LOCK_NAME = "redstone_relay_33"
+config.RELAY_DEPOSIT_LOCK_SIDE = "top"
 
 -- Entry network peripherals (wired to modem of computer_388)
 config.PEDESTAL_NAME    = "item_pedestal_3"
