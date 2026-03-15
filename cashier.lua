@@ -412,6 +412,7 @@ local function eventLoop()
                         if nick then
                             detectedLabel:setText(nick)
                             detectedLabel:setForeground(colors.lime)
+                            refreshActiveLabel()
                         else
                             detectedLabel:setText("(no player nearby)")
                             detectedLabel:setForeground(colors.orange)
