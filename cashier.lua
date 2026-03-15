@@ -78,6 +78,7 @@ local state = {
 }
 
 local cancelRequested = false
+local pendingPurchase  = nil
 
 --  GUI setup 
 local main = basalt.getMainFrame()
@@ -381,76 +382,16 @@ buyBtn:onClick(function()
         writeLog("Purchase attempt: no player detected")
         return
     end
-    basalt.schedule(function() handlePurchase(nick) end)
+    pendingPurchase = nick
 end)
 
 cancelBtn:onClick(function()
     cancelRequested = true
 end)
 
---  Background tasks 
--- Update detected player every second; restart loop on error to survive peripheral glitches
-basalt.schedule(function()
-    while true do
-        local ok, err = pcall(function()
-            while true do
-                local nick = detectNearestPlayer()
-                state.detectedNick = nick
-                if nick then
-                    detectedLabel:setText(nick)
-                    detectedLabel:setForeground(colors.lime)
-                else
-                    detectedLabel:setText("(no player nearby)")
-                    detectedLabel:setForeground(colors.orange)
-                end
-                os.sleep(1)
-            end
-        end)
-        if not ok then
-            writeLog("WARN: player detector loop crashed: " .. tostring(err) .. " - restarting")
-        end
-        os.sleep(1)
-    end
-end)
-
--- Scrolling info text animation (row 3)
-basalt.schedule(function()
-    local msg = "Access to the villager trading hall included!"
-    local padded = msg .. string.rep(" ", W)
-    local len = #padded
-    local doubled = padded .. padded
-    local offset = len - W  -- start with blank screen, message slides in from right
-    while true do
-        local view = doubled:sub(offset + 1, offset + W)
-        scrollLabel:setText(view)
-        offset = (offset + 1) % len
-        os.sleep(0.15)
-    end
-end)
-
--- Animated header: cycle frames to force Basalt re-render
-basalt.schedule(function()
-    local frames = {
-        { bg = colors.blue,      fg = colors.white,  tx = "  * TICKETS *  " },
-        { bg = colors.cyan,      fg = colors.yellow,  tx = "  ** TICKETS **  " },
-        { bg = colors.lightBlue, fg = colors.white,  tx = "  *** TICKETS ***  " },
-        { bg = colors.blue,      fg = colors.yellow, tx = "  >   TICKETS   <  " },
-        { bg = colors.purple,    fg = colors.white,  tx = "  >>  TICKETS  <<  " },
-        { bg = colors.blue,      fg = colors.cyan,   tx = "  >>> TICKETS <<<  " },
-    }
-    local i = 1
-    while true do
-        local f = frames[i]
-        headerLabel:setBackground(f.bg)
-        headerLabel:setForeground(f.fg)
-        headerLabel:setText(padCenter(f.tx, W))
-        i = (i % #frames) + 1
-        os.sleep(0.5)
-    end
-end)
-
--- On startup: fetch ticket count and run pre-checks, then show status
-basalt.schedule(function()
+--  Background event loop
+local function eventLoop()
+    -- Startup: fetch ticket count and run pre-checks
     refreshActiveLabel()
     local ok, err = runPreChecks()
     if ok then
@@ -459,10 +400,88 @@ basalt.schedule(function()
         setStatus("SYSTEM ERROR: " .. err, colors.white, colors.red)
         setBuyBtnEnabled(false)
     end
-end)
+
+    parallel.waitForAll(
+        -- Update detected player every second; restart on error to survive chunk unload/reload
+        function()
+            while true do
+                local pok, perr = pcall(function()
+                    while true do
+                        local nick = detectNearestPlayer()
+                        state.detectedNick = nick
+                        if nick then
+                            detectedLabel:setText(nick)
+                            detectedLabel:setForeground(colors.lime)
+                        else
+                            detectedLabel:setText("(no player nearby)")
+                            detectedLabel:setForeground(colors.orange)
+                        end
+                        os.sleep(1)
+                    end
+                end)
+                if not pok then
+                    writeLog("WARN: player detector loop crashed: " .. tostring(perr) .. " - restarting")
+                end
+                os.sleep(1)
+            end
+        end,
+
+        -- Scrolling info text animation (row 3)
+        function()
+            local msg = "Access to the villager trading hall included!"
+            local padded = msg .. string.rep(" ", W)
+            local len = #padded
+            local doubled = padded .. padded
+            local offset = len - W  -- start with blank screen, message slides in from right
+            while true do
+                local view = doubled:sub(offset + 1, offset + W)
+                scrollLabel:setText(view)
+                offset = (offset + 1) % len
+                os.sleep(0.15)
+            end
+        end,
+
+        -- Animated header: cycle frames to force Basalt re-render
+        function()
+            local frames = {
+                { bg = colors.blue,      fg = colors.white,  tx = "  * TICKETS *  " },
+                { bg = colors.cyan,      fg = colors.yellow,  tx = "  ** TICKETS **  " },
+                { bg = colors.lightBlue, fg = colors.white,  tx = "  *** TICKETS ***  " },
+                { bg = colors.blue,      fg = colors.yellow, tx = "  >   TICKETS   <  " },
+                { bg = colors.purple,    fg = colors.white,  tx = "  >>  TICKETS  <<  " },
+                { bg = colors.blue,      fg = colors.cyan,   tx = "  >>> TICKETS <<<  " },
+            }
+            local i = 1
+            while true do
+                local f = frames[i]
+                headerLabel:setBackground(f.bg)
+                headerLabel:setForeground(f.fg)
+                headerLabel:setText(padCenter(f.tx, W))
+                i = (i % #frames) + 1
+                os.sleep(0.5)
+            end
+        end,
+
+        -- Purchase handler: triggered by buyBtn setting pendingPurchase
+        function()
+            while true do
+                if pendingPurchase then
+                    local nick = pendingPurchase
+                    pendingPurchase = nil
+                    handlePurchase(nick)
+                end
+                os.sleep(0.05)
+            end
+        end
+    )
+end
+
 writeLog("=== CASHIER STARTUP === ID: " .. os.getComputerID()
     .. " | Entry ID: " .. config.ENTRY_COMPUTER_ID
     .. " | Price: " .. config.TICKET_PRICE_SPURS .. " spur")
 writeLog("Peripherals: " .. table.concat(peripheral.getNames(), ", "))
 
-basalt.run()
+parallel.waitForAny(
+    function() basalt.run() end,
+    eventLoop
+)
